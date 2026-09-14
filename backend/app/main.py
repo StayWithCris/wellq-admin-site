@@ -27,6 +27,7 @@ from app.routers import (
     alerts,
     search,
     infrastructure,
+    infra_costs,          # Mejora #6 — Proyector de costos de infraestructura
     analytics,
     users,
     notifications,
@@ -118,6 +119,7 @@ app.include_router(financials.router)
 app.include_router(alerts.router)
 app.include_router(search.router)
 app.include_router(infrastructure.router)
+app.include_router(infra_costs.router)     # Mejora #6 — /api/infrastructure/costs*
 app.include_router(analytics.router)
 app.include_router(users.router)
 app.include_router(settings_router.router)

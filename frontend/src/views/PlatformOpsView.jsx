@@ -8,6 +8,7 @@ import {
 import { useLanguage } from '../contexts/LanguageContext';
 import { Skeleton } from '../components/ui';
 import useHasPermission from '../hooks/useHasPermission'; // ← NUEVO: hook de permisos
+import { InfraCostsPanel } from '../components/platform/InfraCostsPanel'; // Mejora #6 — costos cloud
 import { filterAndSortBySearch, hasSearchQuery, matchesSearch } from '../utils/search';
 
 // ─── Design Tokens para Platform Ops ───
@@ -508,6 +509,11 @@ export const PlatformOpsView = ({ apiCosts, apiLatency, apiPose, apiServers, sea
         )}
 
       </div>
+
+      {/* ── Costo de infraestructura cloud (mejora #6) ── */}
+      <motion.div variants={itemVariants}>
+        <InfraCostsPanel />
+      </motion.div>
 
       {/* ── Infra + App versions ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
