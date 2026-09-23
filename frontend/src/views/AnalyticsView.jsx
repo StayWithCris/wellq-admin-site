@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Smartphone, Tablet, Clock, ShieldCheck, 
@@ -8,8 +8,7 @@ import { Skeleton } from '../components/ui';
 import { useLanguage } from '../contexts/LanguageContext';
 import { filterAndSortBySearch, hasSearchQuery, matchesSearch } from '../utils/search';
 
-// ─── Design Tokens para Analytics (Single Source of Truth) ───
-// Centralizamos la tipología visual mapeada exactamente a tus variables de Tailwind v4
+// ─── Design Tokens para Analytics ───
 const METRIC_META = {
   patientMau: {
     icon: Smartphone,
@@ -46,13 +45,44 @@ const METRIC_META = {
 };
 
 export const AnalyticsView = ({
-  appStats, featureAdoption, adherence, cohorts, soapQuality, loading, searchQuery = '',
+  appStats, featureAdoption, adherence, cohorts, soapQuality, loading: initialLoading, searchQuery = '',
 }) => {
   const { t } = useLanguage();
+
+  // ── Conexión directa al endpoint de Neon si no viene por props ──
+  const [internalSoap, setInternalSoap] = useState(null);
+  const [loadingSoap, setLoadingSoap] = useState(!soapQuality);
+
+  useEffect(() => {
+    if (!soapQuality) {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      fetch(`${apiUrl}/api/ai/soap-quality/`)
+        .then((res) => {
+          if (!res.ok) throw new Error('Error al consultar calidad SOAP');
+          return res.json();
+        })
+        .then((data) => {
+          if (data?.latest) {
+            setInternalSoap(data.latest);
+          }
+          setLoadingSoap(false);
+        })
+        .catch((err) => {
+          console.error('Error cargando SOAP Quality:', err);
+          setLoadingSoap(false);
+        });
+    } else {
+      setLoadingSoap(false);
+    }
+  }, [soapQuality]);
+
+  const activeSoap = soapQuality || internalSoap;
+  const loading = initialLoading || loadingSoap;
 
   const patientApp = appStats?.patients;
   const tabletApp = appStats?.tablet;
   const searchActive = hasSearchQuery(searchQuery);
+
   const metricCards = [
     { label: `${t('overview.patientApp')} - MAU`, value: patientApp?.metrics?.monthly_active_users?.toLocaleString() ?? '0', meta: METRIC_META.patientMau, pct: 100 },
     { label: `${t('overview.clinicianTablet')} - MAU`, value: tabletApp?.metrics?.monthly_active_users?.toLocaleString() ?? '0', meta: METRIC_META.tabletMau, pct: 100 },
@@ -62,6 +92,7 @@ export const AnalyticsView = ({
     { label: t('analytics.crashFreeTablet'), value: `${tabletApp?.metrics?.crash_free_sessions_percentage ?? 0}%`, meta: METRIC_META.crashFree, pct: tabletApp?.metrics?.crash_free_sessions_percentage ?? 0 },
   ];
   const visibleMetricCards = filterAndSortBySearch(metricCards, searchQuery, (item) => [t('analytics.appUsage'), item.label, item.value, t('analytics.live')]);
+
   const featureRows = featureAdoption?.data ?? [
     { feature_name: t('overview.waitingConnection'), adoption_rate_percentage: 0, total_uses: 0, user_feedback_score: 0 },
   ];
@@ -73,6 +104,7 @@ export const AnalyticsView = ({
     f.user_feedback_score,
     t('analytics.uses'),
   ]);
+
   const adherenceRows = adherence?.breakdown_by_week ?? [{ week: t('analytics.weekLabel', { number: 1 }), adherence: 0 }];
   const visibleAdherenceRows = filterAndSortBySearch(adherenceRows, searchQuery, (w) => [
     t('analytics.adherence'),
@@ -82,6 +114,7 @@ export const AnalyticsView = ({
     adherence?.top_dropping_point,
     t('analytics.topDropOff'),
   ]);
+
   const cohortRows = cohorts?.data ?? [
     { cohort: t('overview.waitingConnection'), users: 0, retention_by_month: { M1: 0, M2: 0, M3: 0, M4: 0 } },
   ];
@@ -91,8 +124,9 @@ export const AnalyticsView = ({
     c.users,
     ...Object.entries(c.retention_by_month ?? {}).flat(),
   ]);
+
   const showAppUsage = !searchActive || visibleMetricCards.length > 0 || matchesSearch(searchQuery, t('analytics.appUsage'), t('overview.patientApp'), t('overview.clinicianTablet'));
-  const showSoapQuality = !searchActive || matchesSearch(searchQuery, t('analytics.soapQuality'), t('analytics.acceptanceRate'), t('analytics.notesGenerated'), t('analytics.requireEdits'), t('analytics.timeSaved'), soapQuality?.acceptance_rate_percentage, soapQuality?.total_notes_generated, soapQuality?.edits_required_percentage, soapQuality?.average_time_saved_minutes_per_note);
+  const showSoapQuality = !searchActive || matchesSearch(searchQuery, t('analytics.soapQuality'), t('analytics.acceptanceRate'), t('analytics.notesGenerated'), t('analytics.requireEdits'), t('analytics.timeSaved'), activeSoap?.acceptance_rate_percentage, activeSoap?.total_notes_generated, activeSoap?.edits_required_percentage, activeSoap?.average_time_saved_minutes_per_note);
   const showFeatureAdoption = !searchActive || visibleFeatureRows.length > 0 || matchesSearch(searchQuery, t('analytics.featureAdoption'), t('analytics.last30days'));
   const showAdherence = !searchActive || visibleAdherenceRows.length > 0 || matchesSearch(searchQuery, t('analytics.adherence'), t('analytics.topDropOff'), adherence?.top_dropping_point);
   const showCohorts = !searchActive || visibleCohortRows.length > 0 || matchesSearch(searchQuery, t('analytics.cohortRetention'), t('analytics.users'));
@@ -108,7 +142,6 @@ export const AnalyticsView = ({
     );
   }
 
-  // Variantes de animación idénticas a la coreografía de tu vista Support
   const containerVariants = {
     hidden: {},
     show: { transition: { staggerChildren: 0.05 } },
@@ -140,7 +173,7 @@ export const AnalyticsView = ({
             <h3 className="font-bold text-wellq-dark dark:text-white text-sm">{t('analytics.appUsage')}</h3>
           </div>
           
-          {loading ? (
+          {initialLoading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {[1, 2, 3, 4, 5, 6].map((i) => <Skeleton key={i} className="h-24 w-full rounded-xl" />)}
             </div>
@@ -154,7 +187,7 @@ export const AnalyticsView = ({
         </motion.div>
         )}
 
-        {/* Calidad de Notas SOAP */}
+        {/* Calidad de Notas SOAP (Recomendación #9) */}
         {showSoapQuality && (
         <motion.div 
           variants={itemVariants} 
@@ -163,9 +196,16 @@ export const AnalyticsView = ({
           {/* Brillo ambiental superior */}
           <div className="absolute top-0 left-0 right-0 h-24 bg-gradient-to-b from-wellq-green/10 to-transparent opacity-60 pointer-events-none" />
           
-          <div className="relative flex items-center gap-2 mb-5">
-            <Sparkles size={16} className="text-wellq-green" />
-            <h3 className="font-bold text-wellq-dark dark:text-white text-sm">{t('analytics.soapQuality')}</h3>
+          <div className="relative flex items-center justify-between mb-5">
+            <div className="flex items-center gap-2">
+              <Sparkles size={16} className="text-wellq-green" />
+              <h3 className="font-bold text-wellq-dark dark:text-white text-sm">{t('analytics.soapQuality')}</h3>
+            </div>
+            {activeSoap?.period && (
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-wellq-green/10 text-wellq-green border border-wellq-green/20">
+                {activeSoap.period}
+              </span>
+            )}
           </div>
           
           {loading ? (
@@ -178,29 +218,29 @@ export const AnalyticsView = ({
             <div className="relative space-y-5">
               <div>
                 <div className="text-4xl font-black text-wellq-green tracking-tight leading-none mb-1.5 tabular-nums">
-                  {soapQuality?.acceptance_rate_percentage ?? 0}<span className="text-xl font-bold">%</span>
+                  {activeSoap?.acceptance_rate_percentage ?? 0}<span className="text-xl font-bold">%</span>
                 </div>
                 <div className="text-xs font-semibold text-wellq-gray uppercase tracking-wider">{t('analytics.acceptanceRate')}</div>
               </div>
 
-              {/* Barra de progreso principal de la tarjeta */}
+              {/* Barra de progreso animada */}
               <div className="h-1.5 bg-black/[0.06] dark:bg-white/[0.06] rounded-full overflow-hidden">
                 <motion.div 
                   className="h-full bg-gradient-to-r from-wellq-green to-teal-400 rounded-full"
                   initial={{ width: 0 }}
-                  animate={{ width: `${soapQuality?.acceptance_rate_percentage ?? 0}%` }}
+                  animate={{ width: `${activeSoap?.acceptance_rate_percentage ?? 0}%` }}
                   transition={{ duration: 0.8, ease: 'easeOut' }}
                 />
               </div>
 
-              {/* Filas de detalles estilo Support List */}
+              {/* Filas de detalles desde la base de datos Neon */}
               <div className="space-y-3 pt-2 text-sm">
                 <div className="flex items-center justify-between p-2.5 rounded-xl bg-wellq-gray/5 dark:bg-white/[0.02]">
                   <span className="text-xs font-medium text-wellq-gray flex items-center gap-2">
                     <FileText size={14} /> {t('analytics.notesGenerated')}
                   </span>
                   <span className="font-bold text-wellq-dark dark:text-white tabular-nums">
-                    {(soapQuality?.total_notes_generated ?? 0).toLocaleString()}
+                    {(activeSoap?.total_notes_generated ?? 0).toLocaleString()}
                   </span>
                 </div>
                 
@@ -209,7 +249,7 @@ export const AnalyticsView = ({
                     <AlertTriangle size={14} className="text-amber-500" /> {t('analytics.requireEdits')}
                   </span>
                   <span className="font-bold text-amber-500 tabular-nums">
-                    {soapQuality?.edits_required_percentage ?? 0}%
+                    {activeSoap?.edits_required_percentage ?? 0}%
                   </span>
                 </div>
 
@@ -218,9 +258,21 @@ export const AnalyticsView = ({
                     <CheckCircle2 size={14} /> {t('analytics.timeSaved')}
                   </span>
                   <span className="font-extrabold text-wellq-green tabular-nums">
-                    {soapQuality?.average_time_saved_minutes_per_note ?? 0} min/note
+                    {activeSoap?.average_time_saved_minutes_per_note ?? 0} min/note
                   </span>
                 </div>
+
+                {/* Correcciones Frecuentes auditadas */}
+                {activeSoap?.common_corrections && (
+                  <div className="p-2.5 rounded-xl bg-wellq-gray/5 dark:bg-white/[0.02] border border-wellq-gray/10 dark:border-white/5">
+                    <span className="text-[10px] font-bold text-wellq-gray uppercase tracking-wider block mb-1">
+                      Correcciones Frecuentes Auditadas
+                    </span>
+                    <p className="text-xs text-wellq-dark dark:text-white/80 italic leading-snug">
+                      {activeSoap.common_corrections}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -246,7 +298,7 @@ export const AnalyticsView = ({
           </span>
         </div>
 
-        {loading ? (
+        {initialLoading ? (
           <div className="space-y-4">
             <Skeleton className="h-4 w-full rounded" />
             <Skeleton className="h-4 w-full rounded" />
@@ -271,7 +323,6 @@ export const AnalyticsView = ({
                     </span>
                   </div>
                 </div>
-                {/* Barra de progreso animada con degradado corporativo */}
                 <div className="h-2 bg-wellq-gray/10 dark:bg-white/5 rounded-full overflow-hidden">
                   <motion.div
                     className="h-full bg-gradient-to-r from-wellq-cyan to-wellq-blue rounded-full"
@@ -301,7 +352,7 @@ export const AnalyticsView = ({
             <h3 className="font-bold text-wellq-dark dark:text-white text-sm">{t('analytics.adherence')}</h3>
           </div>
           
-          {loading ? (
+          {initialLoading ? (
             <Skeleton className="h-44 w-full rounded-xl" />
           ) : (
             <>
@@ -351,12 +402,12 @@ export const AnalyticsView = ({
             <h3 className="font-bold text-wellq-dark dark:text-white text-sm">{t('analytics.cohortRetention')}</h3>
           </div>
 
-          {loading ? (
+          {initialLoading ? (
             <Skeleton className="h-44 w-full rounded-xl" />
           ) : (
             <div className="space-y-4">
               {visibleCohortRows.map((c, i) => {
-                const months = Object.entries(c.retention_by_month);
+                const months = Object.entries(c.retention_by_month || {});
                 return (
                   <div key={i} className="p-3 rounded-xl bg-wellq-gray/3 dark:bg-white/[0.01] border border-wellq-gray/5 dark:border-white/5">
                     <div className="flex justify-between text-sm mb-2">
@@ -368,7 +419,6 @@ export const AnalyticsView = ({
                     <div className="flex gap-1.5">
                       {months.map(([m, pct], j) => (
                         <div key={j} className="flex-1 text-center">
-                          {/* El recuadro usa opacidad dinámica basada en el % de retención usando la variable corporativa cyan */}
                           <motion.div
                             className="h-9 rounded-lg flex items-center justify-center border border-wellq-cyan/10"
                             initial={{ scale: 0.9, opacity: 0 }}
@@ -396,7 +446,7 @@ export const AnalyticsView = ({
   );
 };
 
-// ─── Subcomponente Local: Analytics Metric Card (Estilo Support MetricCard) ───
+// ─── Subcomponente Local: Analytics Metric Card ───
 const AnalyticsMetricCard = ({ item }) => {
   const { t } = useLanguage();
   const Icon = item.meta.icon;
@@ -420,7 +470,6 @@ const AnalyticsMetricCard = ({ item }) => {
         {item.label}
       </p>
 
-      {/* Barra de progreso micro-animada en la base inferior de cada tarjeta */}
       <div className="mt-3 h-1 bg-black/[0.05] dark:bg-white/[0.05] rounded-full overflow-hidden">
         <motion.div
           className={`h-full bg-gradient-to-r ${item.meta.bar} rounded-full`}

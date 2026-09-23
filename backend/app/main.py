@@ -8,9 +8,11 @@ Para ejecutar:
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from app.routers import soap_quality
 import structlog
 import logging
 import app.models_db  # registra todos los modelos SQLModel
+
 
 from app.config import settings
 from app.db.neon import init_neon, close_neon, create_db_tables
@@ -126,6 +128,8 @@ app.include_router(settings_router.router)
 app.include_router(features.router)
 app.include_router(plans.router)
 app.include_router(clinic_plans.router)
+app.include_router(soap_quality.router)
+
 
 # Registro de los nuevos componentes adaptados
 # ─────────────────────────────────────────────────────────────────────────────
