@@ -422,7 +422,7 @@ ADMIN_USERS_DATA = [
         "user_id": "USR-WELLQ-001", "full_name": "WellQ Admin",
         "email": "admin@wellq.com",
         "role": "super_admin", "status": "active",
-        "password_hash": "$2b$12$17thIUY51pl1g7hXcQR5PODw.XyYrpgjoEUl0JYEv2otSydVxY8ky",
+        "password_hash": "$2b$12$uCKfUd2nAo2t/HbUnmlV2eREvArLl87oVZyCzqqDKsutvz.M7k.SK",
     },
 ]
 
