@@ -1,0 +1,6 @@
+.env
+env.yaml
+serviceAccountKey.json
+venv/
+__pycache__/
+.git/

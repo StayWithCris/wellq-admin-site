@@ -25,3 +25,5 @@ Thumbs.db
 # IDEs
 .vscode/
 .idea/
+
+backend/env.yaml
