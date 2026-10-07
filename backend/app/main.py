@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import soap_quality
+from app.routers import cohort_heatmap
 import structlog
 import logging
 import app.models_db  # registra todos los modelos SQLModel
@@ -129,6 +130,7 @@ app.include_router(features.router)
 app.include_router(plans.router)
 app.include_router(clinic_plans.router)
 app.include_router(soap_quality.router)
+app.include_router(cohort_heatmap.router)  # Mejora #8 — /api/analytics/retention/heatmap
 
 
 # Registro de los nuevos componentes adaptados

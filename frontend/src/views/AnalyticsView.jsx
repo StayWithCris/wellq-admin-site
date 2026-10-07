@@ -5,6 +5,7 @@ import {
   Sparkles, FileText, CheckCircle2, Percent, TrendingUp, AlertTriangle 
 } from 'lucide-react';
 import { Skeleton } from '../components/ui';
+import CohortHeatmapGrid from '../components/analytics/CohortHeatmapGrid';
 import { useLanguage } from '../contexts/LanguageContext';
 import { filterAndSortBySearch, hasSearchQuery, matchesSearch } from '../utils/search';
 
@@ -442,6 +443,9 @@ export const AnalyticsView = ({
         </motion.div>
         )}
       </div>
+
+      {/* Rec #8 — Mapa de calor de cohortes (real) */}
+      {!searchActive && <CohortHeatmapGrid />}
     </motion.div>
   );
 };
