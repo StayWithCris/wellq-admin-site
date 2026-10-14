@@ -11,6 +11,7 @@ import { UtilizationBar } from '../ui';
 import { apiFetch, API_BASE } from '../../api/client';
 import { PatientHealthSection } from './PatientHealthSection';
 import { HealthRadar } from './HealthRadar';
+import { AuditTimeline } from './AuditTimeline';
 
 // ─── Animaciones Coreografiadas (Estilo Analytics) ───────────────────────────
 const itemVariants = {
@@ -266,8 +267,8 @@ export const ClinicDrawer = ({
   useEffect(() => {
     if (!clinic) return;
     setClinicName(clinic.name ?? '');
-    setClinicPlan(clinic.tier ?? 'Enterprise');
-    setClinicStatus(clinic.status ?? 'Active');
+    setClinicPlan((clinic.tier ?? 'enterprise').toLowerCase());
+    setClinicStatus((clinic.status ?? 'active').toLowerCase());
     setSaveOk(false);
     setSaveError(null);
 
@@ -300,12 +301,11 @@ export const ClinicDrawer = ({
     const id = clinic.clinic_id ?? clinic.id;
     setSaving(true); setSaveOk(false); setSaveError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/clinics/${id}`, {
-        method:  'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ name: clinicName, tier: clinicPlan, status: clinicStatus }),
+      // apiFetch envía el token (Authorization) y lanza error si la respuesta no es OK
+      await apiFetch(`/api/clinics/${id}`, {
+        method: 'PATCH',
+        body:   JSON.stringify({ name: clinicName, tier: clinicPlan, status: clinicStatus }),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       setSaveOk(true);
       setTimeout(() => setSaveOk(false), 3000);
     } catch (err) {
@@ -983,6 +983,13 @@ export const ClinicDrawer = ({
                 <motion.section variants={itemVariants}>
                   <HealthRadar clinicId={clinic.clinic_id ?? clinic.id} />
                 </motion.section>
+
+                {/* Rec #15 — Historial de auditoría (solo quien puede editar) */}
+                {canEdit && (
+                  <motion.section variants={itemVariants}>
+                    <AuditTimeline clinicId={clinic.clinic_id ?? clinic.id} />
+                  </motion.section>
+                )}
               </motion.div>
             )}
 
@@ -1026,9 +1033,9 @@ export const ClinicDrawer = ({
                       onChange={(e) => setClinicPlan(e.target.value)}
                       className="w-full px-4 py-3 border border-wellq-gray/20 dark:border-white/10 rounded-xl text-sm font-semibold text-wellq-dark dark:text-white dark:bg-white/[0.02] bg-wellq-gray/5 focus:outline-none focus:ring-2 focus:ring-wellq-cyan/50 focus:border-wellq-cyan transition-all cursor-pointer"
                     >
-                      <option value="Enterprise">Enterprise</option>
-                      <option value="Pro">Pro / SMB</option>
-                      <option value="Trial">Trial</option>
+                      <option value="enterprise">Enterprise</option>
+                      <option value="smb">Pro / SMB</option>
+                      <option value="trial">Trial</option>
                     </select>
                   </div>
 
@@ -1039,9 +1046,9 @@ export const ClinicDrawer = ({
                       onChange={(e) => setClinicStatus(e.target.value)}
                       className="w-full px-4 py-3 border border-wellq-gray/20 dark:border-white/10 rounded-xl text-sm font-semibold text-wellq-dark dark:text-white dark:bg-white/[0.02] bg-wellq-gray/5 focus:outline-none focus:ring-2 focus:ring-wellq-cyan/50 focus:border-wellq-cyan transition-all cursor-pointer"
                     >
-                      <option value="Active">Active</option>
-                      <option value="Suspended">Suspended</option>
-                      <option value="Churned">Churned</option>
+                      <option value="active">Active</option>
+                      <option value="suspended">Suspended</option>
+                      <option value="churned">Churned</option>
                     </select>
                   </div>
 
