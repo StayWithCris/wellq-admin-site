@@ -10,6 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import soap_quality
 from app.routers import cohort_heatmap
+from app.routers import clinic_radar
 import structlog
 import logging
 import app.models_db  # registra todos los modelos SQLModel
@@ -131,6 +132,7 @@ app.include_router(plans.router)
 app.include_router(clinic_plans.router)
 app.include_router(soap_quality.router)
 app.include_router(cohort_heatmap.router)  # Mejora #8 — /api/analytics/retention/heatmap
+app.include_router(clinic_radar.router)  # Mejora #10 — /api/clinics/{id}/health-radar
 
 
 # Registro de los nuevos componentes adaptados

@@ -10,6 +10,7 @@ import {
 import { UtilizationBar } from '../ui';
 import { apiFetch, API_BASE } from '../../api/client';
 import { PatientHealthSection } from './PatientHealthSection';
+import { HealthRadar } from './HealthRadar';
 
 // ─── Animaciones Coreografiadas (Estilo Analytics) ───────────────────────────
 const itemVariants = {
@@ -976,6 +977,11 @@ export const ClinicDrawer = ({
                 {/* Patient Health Section Component */}
                 <motion.section variants={itemVariants}>
                   <PatientHealthSection clinicId={clinic.clinic_id ?? clinic.id} />
+                </motion.section>
+
+                {/* Rec #10 — Radar de salud de 5 ejes */}
+                <motion.section variants={itemVariants}>
+                  <HealthRadar clinicId={clinic.clinic_id ?? clinic.id} />
                 </motion.section>
               </motion.div>
             )}
