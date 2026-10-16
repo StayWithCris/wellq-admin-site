@@ -4,7 +4,7 @@ import {
   Settings, Server, Package, Bell, Search, ChevronDown,
   Activity, RefreshCw, PanelLeftClose, PanelLeftOpen,
   Trash2, X, Megaphone, Mail, Smartphone, CheckCircle, Clock,
-  LogOut, Moon, Sun, LifeBuoy, ShieldOff,
+  LogOut, Moon, Sun, LifeBuoy, ShieldOff, History,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -17,6 +17,7 @@ import { AnalyticsView }   from './views/AnalyticsView';
 import { PlansView }       from './views/PlansView';
 import { SettingsView }    from './views/SettingsView';
 import { SupportView }     from './views/SupportView';
+import { AuditCenterView } from './views/AuditCenterView';
 import ClinicPortalPage    from './views/ClinicPortalPage';
 
 import LoginPage from "./components/login/LoginPage";
@@ -39,6 +40,7 @@ const NAV_KEYS = [
   { id: 'analytics',  key: 'analytics',  icon: BarChart3,       permission: 'analytics.view' },
   { id: 'support',    key: 'support',    icon: LifeBuoy,        permission: 'tickets.view'   },
   { id: 'settings',   key: 'settings',   icon: Settings,        permission: 'settings.view'  },
+  { id: 'audit',      key: 'audit',      icon: History,         permission: 'audit.view'     }, // Rec #16 (solo super_admin)
 ];
 
 const VIEWS_WITH_DATERANGE = ['overview', 'financials', 'platform', 'analytics'];
@@ -52,6 +54,7 @@ const SEARCH_PLACEHOLDER_FALLBACKS = {
   analytics:  'Search analytics...',
   support:    'Search tickets...',
   settings:   'Search settings...',
+  audit:      'Search audit log...',
 };
 const getDateRangeFromPeriod = (period) => {
   const now = new Date();
@@ -120,6 +123,7 @@ const VIEW_META = {
   analytics:  { icon: BarChart3,       gradient: 'from-[#2cb7e4] to-[#16f8f9]',  sub: 'Adopción y calidad del sistema' },
   support:    { icon: LifeBuoy,        gradient: 'from-[#16f8f9] to-[#1fed92]', sub: 'Ticket management' },
   settings:   { icon: Settings,        gradient: 'from-[#8c9299] to-[#2cb7e4]',  sub: 'Global configuration' },
+  audit:      { icon: History,         gradient: 'from-[#8c9299] to-[#2cb7e4]',  sub: 'Registro de auditoría' },
 };
 
 // ── Notification Panel ───────────────────────────────────────────────────────
@@ -1253,6 +1257,8 @@ export default function App() {
             onRefreshUsers={handleRefreshUsers}
           />
         );
+      case 'audit':
+        return <AuditCenterView />;
       default:
         return null;
     }

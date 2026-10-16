@@ -8,6 +8,7 @@
     "analytics": "Product Analytics",
     "settings": "Settings",
     "support": "Support",
+    "audit": "Audit Log",
     "collapse": "Collapse menu",
     "expand": "Expand menu"
   },
@@ -39,6 +40,7 @@
       "financials": "Search financials...",
       "platform": "Search platform ops...",
       "analytics": "Search analytics...",
+      "audit": "Search audit log...",
       "support": "Search tickets...",
       "settings": "Search settings..."
     }

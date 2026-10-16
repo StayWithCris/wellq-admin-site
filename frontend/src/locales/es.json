@@ -8,6 +8,7 @@
     "analytics": "Analíticas de Producto",
     "settings": "Configuración",
     "support": "Soporte",
+    "audit": "Auditoría",
     "collapse": "Colapsar menú",
     "expand": "Expandir menú"
   },
@@ -39,6 +40,7 @@
       "financials": "Buscar en finanzas...",
       "platform": "Buscar en operaciones...",
       "analytics": "Buscar en analíticas...",
+      "audit": "Buscar en auditoría...",
       "support": "Buscar tickets...",
       "settings": "Buscar en configuración..."
     }
