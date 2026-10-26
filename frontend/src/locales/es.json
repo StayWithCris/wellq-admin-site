@@ -1,4 +1,37 @@
 {
+  "recs": {
+    "permMatrix": "Matriz de permisos",
+    "permission": "Permiso",
+    "noRolesPerms": "No hay roles o permisos para mostrar.",
+    "allowed": "Permitido",
+    "notAllowed": "No permitido",
+    "simTitle": "Simulador de ingresos",
+    "simSub": "Parte de tu MRR real y proyecta con los supuestos que muevas. Es una simulación, no una predicción.",
+    "newClinics": "Clínicas nuevas por mes",
+    "monthlyChurn": "Churn mensual",
+    "monthlyExpansion": "Expansión mensual",
+    "horizon": "Horizonte",
+    "monthsSuffix": " meses",
+    "simBase": "Base: {{n}} clínicas activas · MRR actual {{mrr}} · cada clínica nueva aporta {{avg}} (promedio actual).",
+    "simError": "No se pudo simular",
+    "mrr6": "MRR a 6 meses",
+    "mrr12": "MRR a 12 meses",
+    "arr12": "ARR a 12 meses",
+    "monthN": "Mes {{m}}",
+    "capClinic": "clínica",
+    "capClinics": "clínicas",
+    "capNear": "cerca de su límite de pacientes",
+    "capSummary": "{{c}} sobre el límite · {{w}} sobre el {{t}}% — oportunidad de upgrade",
+    "capPatients": "pacientes",
+    "capCurrentPlan": "plan actual",
+    "capSuggested": "sugerido",
+    "capNoPlan": "sin plan superior definido",
+    "capUpgrade": "Proponer upgrade",
+    "capNote": "\"Proponer upgrade\" abre un borrador en tu correo; WellQ no envía nada automáticamente.",
+    "mailSubject": "Tu clínica {{name}} está cerca del límite de pacientes",
+    "mailBody": "Hola,\n\nTu clínica {{name}} está usando {{used}} de {{limit}} pacientes ({{pct}}%).{{plan}}\n\nSi quieres, te ayudamos con el cambio.\n\nEquipo WellQ",
+    "mailPlan": "\nPara seguir creciendo sin interrupciones te recomendamos el plan {{plan}}."
+  },
   "sidebar": {
     "overview": "Resumen",
     "clinics": "Gestión de Clínicas",
@@ -8,7 +41,6 @@
     "analytics": "Analíticas de Producto",
     "settings": "Configuración",
     "support": "Soporte",
-    "audit": "Auditoría",
     "collapse": "Colapsar menú",
     "expand": "Expandir menú"
   },
@@ -40,7 +72,6 @@
       "financials": "Buscar en finanzas...",
       "platform": "Buscar en operaciones...",
       "analytics": "Buscar en analíticas...",
-      "audit": "Buscar en auditoría...",
       "support": "Buscar tickets...",
       "settings": "Buscar en configuración..."
     }

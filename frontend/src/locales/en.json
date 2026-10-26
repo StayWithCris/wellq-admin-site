@@ -1,4 +1,37 @@
 {
+  "recs": {
+    "permMatrix": "Permission Matrix",
+    "permission": "Permission",
+    "noRolesPerms": "No roles or permissions to show.",
+    "allowed": "Allowed",
+    "notAllowed": "Not allowed",
+    "simTitle": "Revenue Simulator",
+    "simSub": "Starts from your real MRR and projects using the assumptions you adjust. It is a simulation, not a prediction.",
+    "newClinics": "New clinics per month",
+    "monthlyChurn": "Monthly churn",
+    "monthlyExpansion": "Monthly expansion",
+    "horizon": "Horizon",
+    "monthsSuffix": " months",
+    "simBase": "Base: {{n}} active clinics · current MRR {{mrr}} · each new clinic adds {{avg}} (current average).",
+    "simError": "Could not run the simulation",
+    "mrr6": "MRR at 6 months",
+    "mrr12": "MRR at 12 months",
+    "arr12": "ARR at 12 months",
+    "monthN": "Month {{m}}",
+    "capClinic": "clinic",
+    "capClinics": "clinics",
+    "capNear": "near their patient limit",
+    "capSummary": "{{c}} over the limit · {{w}} over {{t}}% — upgrade opportunity",
+    "capPatients": "patients",
+    "capCurrentPlan": "current plan",
+    "capSuggested": "suggested",
+    "capNoPlan": "no higher plan defined",
+    "capUpgrade": "Propose upgrade",
+    "capNote": "\"Propose upgrade\" opens a draft in your email client; WellQ does not send anything automatically.",
+    "mailSubject": "Your clinic {{name}} is close to its patient limit",
+    "mailBody": "Hello,\n\nYour clinic {{name}} is using {{used}} of {{limit}} patients ({{pct}}%).{{plan}}\n\nWe can help with the change if you like.\n\nWellQ Team",
+    "mailPlan": "\nTo keep growing without interruptions we recommend the {{plan}} plan."
+  },
   "sidebar": {
     "overview": "Overview",
     "clinics": "Clinic Management",
@@ -8,7 +41,6 @@
     "analytics": "Product Analytics",
     "settings": "Settings",
     "support": "Support",
-    "audit": "Audit Log",
     "collapse": "Collapse menu",
     "expand": "Expand menu"
   },
@@ -40,7 +72,6 @@
       "financials": "Search financials...",
       "platform": "Search platform ops...",
       "analytics": "Search analytics...",
-      "audit": "Search audit log...",
       "support": "Search tickets...",
       "settings": "Search settings..."
     }
