@@ -1,0 +1,18 @@
+C4Context
+    title Nivel 1 - Contexto de WellQ Admin Site
+
+    Person(admin, "Administrador de Alloxentric", "Gestiona clínicas, planes, finanzas y auditoría")
+    Person(oper, "Analista de operaciones", "Valida funcionalidades (rol Operations Analyst)")
+
+    System(sys, "WellQ Admin Site", "Panel web multi-tenant para administrar la plataforma WellQ: clínicas, planes, finanzas, analítica, soporte y auditoría")
+
+    System_Ext(wellq, "Plataforma WellQ", "Apps de paciente y tablet clínica, MongoDB y servicio de IA de notas SOAP")
+    System_Ext(kc, "Keycloak", "Autenticación centralizada de WellQ")
+
+    Rel(admin, sys, "Usa el panel", "HTTPS")
+    Rel(oper, sys, "Prueba y valida", "HTTPS")
+    Rel(sys, wellq, "(futuro) Lee datos reales; hoy usa datos de demostración")
+    Rel(sys, kc, "(futuro) Inicio de sesión centralizado")
+
+    UpdateRelStyle(sys, wellq, $textColor="gray", $lineColor="gray")
+    UpdateRelStyle(sys, kc, $textColor="gray", $lineColor="gray")

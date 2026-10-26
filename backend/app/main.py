@@ -13,6 +13,8 @@ from app.routers import cohort_heatmap
 from app.routers import clinic_radar
 from app.routers import clinic_audit
 from app.routers import audit_center
+from app.routers import revenue_simulator
+from app.routers import capacity_alerts
 import structlog
 import logging
 import app.models_db  # registra todos los modelos SQLModel
@@ -137,6 +139,8 @@ app.include_router(cohort_heatmap.router)  # Mejora #8 — /api/analytics/retent
 app.include_router(clinic_radar.router)  # Mejora #10 — /api/clinics/{id}/health-radar
 app.include_router(clinic_audit.router)  # Mejora #15 — /api/clinics/{id}/audit-logs
 app.include_router(audit_center.router)  # Mejora #16 — /api/audit/logs
+app.include_router(revenue_simulator.router)  # Mejora #3 — /api/simulator/revenue
+app.include_router(capacity_alerts.router)  # Mejora #21 — /api/capacity/alerts
 
 
 # Registro de los nuevos componentes adaptados

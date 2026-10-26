@@ -15,6 +15,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import LanguageSelector from './LanguageSelector';
 import useHasPermission from '../hooks/useHasPermission';
+import PermissionMatrix from '../components/settings/PermissionMatrix';
 import { filterAndSortBySearch, hasSearchQuery, matchesSearch } from '../utils/search';
 
 // ─── Design Tokens (Meta) ────────────────────────────────────────────────────
@@ -656,6 +657,7 @@ export const SettingsView = ({
           <div className="flex gap-1.5 bg-wellq-gray/5 dark:bg-white/[0.03] p-1.5 rounded-xl mb-6 border border-wellq-gray/10 dark:border-white/5 shadow-inner w-fit">
             {[
               ...((canManageSettings || canManageRoles) ? [{ id: 'roles', label: t('settings.rolesAndPermissions') }] : []),
+              ...((canManageSettings || canManageRoles) ? [{ id: 'matrix', label: 'Matriz de permisos' }] : []),
               ...((canManageSettings || canManageUsers) ? [{ id: 'users', label: t('settings.users') }] : []),
             ].map((tab) => (
               <button
@@ -674,7 +676,11 @@ export const SettingsView = ({
 
           {/* Sub-tab content */}
           <AnimatePresence mode="wait">
-            {teamSubTab === 'roles' ? (
+            {teamSubTab === 'matrix' ? (
+              <motion.div key="subtab-matrix" variants={tabVariants} initial="hidden" animate="enter" exit="exit">
+                <PermissionMatrix roles={roles} permissions={allPermissions} />
+              </motion.div>
+            ) : teamSubTab === 'roles' ? (
               <motion.div key="subtab-roles" variants={tabVariants} initial="hidden" animate="enter" exit="exit">
                 {rolesLoading ? (
                   <div className="flex justify-center py-16">

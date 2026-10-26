@@ -1,0 +1,22 @@
+C4Container
+    title Nivel 2 - Contenedores de WellQ Admin Site
+
+    Person(user, "Administrador / Analista", "Usa el panel")
+
+    System_Boundary(b1, "WellQ Admin Site") {
+        Container(spa, "Panel web (SPA)", "React 19, Vite, Tailwind, recharts", "Overview, Clinics, Plans, Financials, Platform, Analytics, Support, Settings y Auditoría. Desplegado en Vercel")
+        Container(api, "API backend", "Python, FastAPI asíncrono, Docker, Cloud Run", "Reglas de negocio, roles y permisos, métricas y auditoría")
+        ContainerDb(db, "Base de datos", "PostgreSQL en Neon", "Clínicas, planes, usuarios, roles, métricas SOAP y registro de auditoría")
+    }
+
+    System_Ext(ci, "GitHub + Vercel + Cloud Build", "Vercel publica el panel al hacer push; Cloud Build construye la imagen Docker")
+    System_Ext(ext, "MongoDB y Keycloak de WellQ", "Sistemas externos, a futuro")
+
+    Rel(user, spa, "Usa", "HTTPS")
+    Rel(spa, api, "Solicitudes REST con JSON", "HTTPS + token JWT")
+    Rel(api, db, "Lee y escribe", "SQLAlchemy asíncrono, TLS")
+    Rel(ci, spa, "Publica")
+    Rel(ci, api, "Despliega imagen")
+    Rel(api, ext, "(futuro) Sincronización y autenticación")
+
+    UpdateRelStyle(api, ext, $textColor="gray", $lineColor="gray")

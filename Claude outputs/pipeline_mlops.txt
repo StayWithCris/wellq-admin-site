@@ -1,0 +1,19 @@
+flowchart TD
+    A["1. Ingesta<br/>Sesión clínica desde la tablet<br/>Cola de mensajes"]:::prop
+    B["2. Preprocesamiento<br/>Transcripción, limpieza y anonimización"]:::prop
+    C["3. Invocación del modelo<br/>El modelo redacta la nota SOAP"]:::prop
+    E["Errores y fallbacks<br/>1) Reintento con espera<br/>2) Modelo alterno<br/>3) Plantilla manual<br/>Todo fallo queda registrado"]:::err
+    D["4. Validación<br/>Formato S-O-A-P y campos obligatorios"]:::prop
+    F["5. Entrega al profesional<br/>Acepta o edita la nota"]:::prop
+    G["6. Telemetría y auditoría<br/>Aceptación, ediciones y minutos ahorrados<br/>Tabla de métricas SOAP en Neon"]:::impl
+    H["7. Monitoreo en WellQ Admin Site<br/>/api/ai/soap-quality y tarjeta en Analytics"]:::impl
+    I["8. Mejora continua<br/>Correcciones comunes ajustan instrucciones o modelo"]:::prop
+
+    A --> B --> C --> D --> F --> G --> H --> I
+    C -- "falla o tarda" --> E
+    E -- "resultado" --> D
+    I -. "nuevas instrucciones" .-> C
+
+    classDef impl fill:#D5E8D4,stroke:#2E7D32,color:#000
+    classDef prop fill:#FFF2CC,stroke:#B8860B,stroke-dasharray:5 5,color:#000
+    classDef err fill:#F8CECC,stroke:#B85450,stroke-dasharray:5 5,color:#000

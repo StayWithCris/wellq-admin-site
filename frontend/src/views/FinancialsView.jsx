@@ -9,6 +9,7 @@ import { MRRChart } from '../components/charts/MRRChart';
 import { ChurnHeatmap } from '../components/charts/ChurnHeatmap';
 import { ChurnRegionModal } from '../components/charts/ChurnRegionModal';
 import { Skeleton } from '../components/ui';
+import RevenueSimulator from '../components/financials/RevenueSimulator';
 import { useLanguage } from '../contexts/LanguageContext';
 import { filterAndSortBySearch, hasSearchQuery, matchesSearch } from '../utils/search';
 
@@ -249,6 +250,13 @@ export const FinancialsView = ({ mrrData, churnRegions, loading = false, searchQ
               );
             })}
           </div>
+        </motion.div>
+      )}
+
+      {/* Mejora #3 — Simulador de ingresos */}
+      {!searchActive && (
+        <motion.div variants={itemVariants}>
+          <RevenueSimulator />
         </motion.div>
       )}
     </motion.div>

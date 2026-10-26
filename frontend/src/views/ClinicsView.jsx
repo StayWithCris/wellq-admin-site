@@ -10,6 +10,7 @@ import {
 import { Skeleton } from '../components/ui';
 import { ClinicRow }        from '../components/clinics/ClinicRow';
 import { ClinicDrawer }     from '../components/clinics/ClinicDrawer';
+import CapacityAlerts      from '../components/clinics/CapacityAlerts';
 import { ImpersonateModal } from '../components/clinics/ImpersonateModal';
 import { API_BASE, apiFetch } from '../api/client';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -1062,6 +1063,9 @@ export const ClinicsView = ({ apiClinics, clinicsLoading, onImpersonate, onRefre
       initial="hidden"
       animate="show"
     >
+      {/* Mejora #21 — Alertas de límite de pacientes */}
+      <CapacityAlerts />
+
       <motion.div variants={itemVariants} className="grid grid-cols-2 xl:grid-cols-4 gap-5">
         <KpiCard
           icon={Building2}

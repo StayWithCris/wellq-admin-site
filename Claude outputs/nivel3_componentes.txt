@@ -1,0 +1,27 @@
+C4Component
+    title Nivel 3 - Componentes de la API backend
+
+    Container(spa, "Panel web (SPA)", "React", "Interfaz del administrador")
+    ContainerDb(db, "PostgreSQL en Neon", "PostgreSQL", "Base de datos del sistema")
+
+    Container_Boundary(api, "API backend (FastAPI)") {
+        Component(cors, "Middleware CORS", "FastAPI", "Permite solo los orígenes autorizados")
+        Component(auth, "Autenticación y roles", "JWT, RBAC", "Valida el token y aplica permisos; require_super_admin")
+        Component(gest, "Routers de gestión", "FastAPI", "clinics, plans, financials, settings, users, roles, support")
+        Component(anal, "Routers de analítica e IA", "FastAPI", "analytics, cohort_heatmap (#8), soap_quality (#9)")
+        Component(salud, "Routers de salud y costos", "FastAPI", "health-check (#22), infra_costs (#6), clinic_radar (#10)")
+        Component(aud, "Routers de auditoría", "FastAPI", "clinic_audit (#15), audit_center (#16)")
+        Component(datos, "Modelos y acceso a datos", "SQLModel, SQLAlchemy", "Tablas y sesión asíncrona")
+    }
+
+    Rel(spa, cors, "Solicitudes", "HTTPS / REST")
+    Rel(cors, auth, "Token JWT")
+    Rel(auth, gest, "Autoriza")
+    Rel(auth, anal, "Autoriza")
+    Rel(auth, salud, "Autoriza")
+    Rel(auth, aud, "Autoriza")
+    Rel(gest, datos, "Usa")
+    Rel(anal, datos, "Usa")
+    Rel(salud, datos, "Usa")
+    Rel(aud, datos, "Usa")
+    Rel(datos, db, "SQL", "TLS")
