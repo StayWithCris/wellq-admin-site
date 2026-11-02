@@ -657,7 +657,7 @@ export const SettingsView = ({
           <div className="flex gap-1.5 bg-wellq-gray/5 dark:bg-white/[0.03] p-1.5 rounded-xl mb-6 border border-wellq-gray/10 dark:border-white/5 shadow-inner w-fit">
             {[
               ...((canManageSettings || canManageRoles) ? [{ id: 'roles', label: t('settings.rolesAndPermissions') }] : []),
-              ...((canManageSettings || canManageRoles) ? [{ id: 'matrix', label: 'Matriz de permisos' }] : []),
+              ...((canManageSettings || canManageRoles) ? [{ id: 'matrix', label: t('recs.permMatrix') }] : []),
               ...((canManageSettings || canManageUsers) ? [{ id: 'users', label: t('settings.users') }] : []),
             ].map((tab) => (
               <button

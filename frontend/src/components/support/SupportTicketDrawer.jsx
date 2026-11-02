@@ -74,6 +74,7 @@ const fmtRelative = (iso) => {
 
 // ─── Drawer component ─────────────────────────────────────────────────────────
 export const SupportTicketDrawer = ({ ticketId, onClose, onUpdated, categories = [], canManageTickets = false }) => {
+  const { t: tx } = useLanguage();
   const { t } = useLanguage();
 
   const [ticket,      setTicket]     = useState(null);
@@ -290,7 +291,7 @@ export const SupportTicketDrawer = ({ ticketId, onClose, onUpdated, categories =
         exit={{   x: '100%',  opacity: 0 }}
         transition={{ type: 'spring', stiffness: 340, damping: 34, mass: 0.9 }}
         className="fixed right-0 top-0 h-full w-full max-w-[460px] z-[110] flex flex-col bg-white dark:bg-wellq-dark shadow-2xl border-l border-wellq-gray/20 dark:border-white/10 font-sans"
-        aria-label="Ticket details"
+        aria-label={tx('ux.ticketDetails')}
         role="dialog"
       >
         {/* Color banner */}
@@ -330,7 +331,7 @@ export const SupportTicketDrawer = ({ ticketId, onClose, onUpdated, categories =
           <button
             onClick={() => onClose(false)}
             className="p-2 rounded-xl text-wellq-gray hover:text-wellq-dark dark:hover:text-white hover:bg-wellq-gray/10 dark:hover:bg-white/10 transition-colors flex-shrink-0 mt-1 cursor-pointer"
-            aria-label="Close"
+            aria-label={tx('ux.close')}
           >
             <X size={18} strokeWidth={2.5} />
           </button>
@@ -443,7 +444,7 @@ export const SupportTicketDrawer = ({ ticketId, onClose, onUpdated, categories =
                   )}
 
                   {/* Details grid */}
-                  <Section label="Details">
+                  <Section label={tx('ux.details')}>
                     <div className="rounded-xl border border-wellq-gray/10 dark:border-white/5 overflow-hidden divide-y divide-wellq-gray/10 dark:divide-white/5 bg-wellq-gray/3 dark:bg-white/[0.02]">
                       <DetailRow icon={Building2} label={t('support.clinic')}   value={ticket.clinic_name ?? ticket.clinic_id} />
                       <DetailRow icon={User}      label={t('support.reporter')} value={ticket.reporter_name ?? '—'} />
@@ -464,7 +465,7 @@ export const SupportTicketDrawer = ({ ticketId, onClose, onUpdated, categories =
                   </Section>
 
                   {/* Timeline */}
-                  <Section label="Timeline">
+                  <Section label={tx('ux.timeline')}>
                     <div className="space-y-0 relative mt-2">
                       {ticket.closed_at && (
                         <div className="absolute left-[15px] top-[30px] bottom-[30px] w-[2px] bg-wellq-gray/10 dark:bg-white/10 rounded-full" />
@@ -808,6 +809,7 @@ const CustomResponderSelect = ({
   suggestedTeam,
   placeholder = 'Seleccionar…',
 }) => {
+  const { t: tx } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef(null);
 
@@ -919,7 +921,7 @@ const CustomResponderSelect = ({
                   </span>
                   {suggestedTeam === team && (
                     <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase tracking-wide bg-wellq-cyan/10 text-wellq-cyan border border-wellq-cyan/25 leading-none">
-                      ★ Recomendado
+                      {tx('ux.recommended')}
                     </span>
                   )}
                 </div>

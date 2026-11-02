@@ -15,8 +15,10 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ShieldAlert, Loader2, ExternalLink, AlertTriangle } from 'lucide-react';
 import { apiFetch } from '../../api/client';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 export const ImpersonateModal = ({ clinic, onClose, onSuccess }) => {
+  const { t: tx } = useLanguage();
   const [reason,  setReason]  = useState('');
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState(null);
@@ -80,10 +82,10 @@ export const ImpersonateModal = ({ clinic, onClose, onSuccess }) => {
               </div>
               <div>
                 <h2 className="font-bold text-wellq-dark dark:text-white text-sm leading-tight">
-                  Acceso de Soporte
+                  {tx('ux.supportAccess')}
                 </h2>
                 <p className="text-xs font-medium text-wellq-gray mt-0.5">
-                  Entrando como →{' '}
+                  {tx('ux.signingInAs')}{' '}
                   <span className="font-black text-wellq-cyan">{clinic?.name}</span>
                 </p>
               </div>
@@ -108,8 +110,8 @@ export const ImpersonateModal = ({ clinic, onClose, onSuccess }) => {
               >
                 <ExternalLink size={28} className="text-wellq-cyan" />
               </motion.div>
-              <p className="font-bold text-wellq-dark dark:text-white">Sesión iniciada</p>
-              <p className="text-sm text-wellq-gray">Abriendo el portal de la clínica...</p>
+              <p className="font-bold text-wellq-dark dark:text-white">{tx('ux.sessionStarted')}</p>
+              <p className="text-sm text-wellq-gray">{tx('ux.openingTheClinicPortal')}</p>
             </div>
           ) : (
             <>
@@ -119,20 +121,20 @@ export const ImpersonateModal = ({ clinic, onClose, onSuccess }) => {
                 <div className="flex items-start gap-3 p-3.5 bg-amber-50 dark:bg-amber-500/5 border border-amber-200 dark:border-amber-500/15 rounded-xl">
                   <AlertTriangle size={15} className="text-amber-500 mt-0.5 flex-shrink-0" strokeWidth={2.2} />
                   <p className="text-xs font-medium text-amber-700 dark:text-amber-400 leading-relaxed">
-                    Esta acción queda registrada permanentemente en el audit log con tu identidad de administrador.
+                    {tx('ux.thisActionIsPermanentlyRecordedIn')}
                   </p>
                 </div>
 
                 {/* Textarea de justificación */}
                 <div>
                   <label className="block text-xs font-bold text-wellq-gray uppercase tracking-wider mb-1.5">
-                    Justificación ética{' '}
+                    {tx('ux.ethicalJustification')}{' '}
                     <span className="text-red-400 normal-case font-medium">*</span>
                   </label>
                   <textarea
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
-                    placeholder="Describe la razón del acceso de soporte..."
+                    placeholder={tx('ux.describeTheReasonForSupportAccess')}
                     rows={3}
                     autoFocus
                     className="w-full px-4 py-2.5 border border-wellq-gray/30 rounded-xl text-sm text-wellq-dark dark:text-white placeholder-wellq-gray/40 focus:outline-none focus:ring-2 focus:ring-wellq-cyan focus:border-transparent transition-all resize-none dark:bg-wellq-dark/50"
@@ -142,7 +144,7 @@ export const ImpersonateModal = ({ clinic, onClose, onSuccess }) => {
                     <span className={`text-[10px] font-semibold tabular-nums ${
                       isValid ? 'text-wellq-green' : 'text-wellq-gray'
                     }`}>
-                      {reason.trim().length} / mín. 10
+                      {reason.trim().length} {tx('ux.min10')}
                     </span>
                   </div>
                 </div>
@@ -162,7 +164,7 @@ export const ImpersonateModal = ({ clinic, onClose, onSuccess }) => {
                   disabled={loading}
                   className="flex-1 px-4 py-2.5 rounded-xl text-sm font-bold text-wellq-dark dark:text-white bg-white dark:bg-white/5 border border-wellq-gray/20 dark:border-white/10 hover:bg-wellq-gray/5 dark:hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-50"
                 >
-                  Cancelar
+                  {tx('ux.cancel')}
                 </button>
                 <button
                   onClick={handleConfirm}
@@ -170,8 +172,8 @@ export const ImpersonateModal = ({ clinic, onClose, onSuccess }) => {
                   className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-500 text-white rounded-xl text-sm font-bold hover:bg-amber-600 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-sm shadow-amber-500/20"
                 >
                   {loading
-                    ? <><Loader2 size={15} className="animate-spin" /> Iniciando...</>
-                    : <><ShieldAlert size={15} /> Confirmar Acceso</>
+                    ? <><Loader2 size={15} className="animate-spin" /> {tx('ux.starting')}</>
+                    : <><ShieldAlert size={15} /> {tx('ux.confirmAccess')}</>
                   }
                 </button>
               </div>

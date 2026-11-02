@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import en from '../locales/en.json';
 import es from '../locales/es.json';
 
@@ -9,6 +9,11 @@ export function LanguageProvider({ children }) {
   const [locale, setLocale] = useState(() => {
     return localStorage.getItem('lang') || 'en';
   });
+
+  // Accesibilidad (Mejora #24): el atributo lang del documento sigue al idioma elegido
+  useEffect(() => {
+    document.documentElement.lang = locale === 'es' ? 'es-CL' : 'en';
+  }, [locale]);
 
   const setLanguage = (lang) => {
     setLocale(lang);

@@ -48,6 +48,7 @@ const METRIC_META = {
 export const AnalyticsView = ({
   appStats, featureAdoption, adherence, cohorts, soapQuality, loading: initialLoading, searchQuery = '',
 }) => {
+  const { t: tx } = useLanguage();
   const { t } = useLanguage();
 
   // ── Conexión directa al endpoint de Neon si no viene por props ──
@@ -259,7 +260,7 @@ export const AnalyticsView = ({
                     <CheckCircle2 size={14} /> {t('analytics.timeSaved')}
                   </span>
                   <span className="font-extrabold text-wellq-green tabular-nums">
-                    {activeSoap?.average_time_saved_minutes_per_note ?? 0} min/note
+                    {activeSoap?.average_time_saved_minutes_per_note ?? 0} {tx('ux.minNote')}
                   </span>
                 </div>
 
@@ -267,7 +268,7 @@ export const AnalyticsView = ({
                 {activeSoap?.common_corrections && (
                   <div className="p-2.5 rounded-xl bg-wellq-gray/5 dark:bg-white/[0.02] border border-wellq-gray/10 dark:border-white/5">
                     <span className="text-[10px] font-bold text-wellq-gray uppercase tracking-wider block mb-1">
-                      Correcciones Frecuentes Auditadas
+                      {tx('ux.auditedFrequentCorrections')}
                     </span>
                     <p className="text-xs text-wellq-dark dark:text-white/80 italic leading-snug">
                       {activeSoap.common_corrections}

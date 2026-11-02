@@ -9,7 +9,7 @@ const LANGUAGES = {
 };
 
 const LanguageSelector = () => {
-  const { locale, setLanguage } = useLanguage();
+  const { locale, setLanguage, t } = useLanguage();
   const [open, setOpen] = useState(false);
   const containerRef = useRef(null);
 
@@ -31,6 +31,9 @@ const LanguageSelector = () => {
       <button
         type="button"
         onClick={() => setOpen(!open)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={`${t('ux.language')}: ${currentLang.label}`}
         className="w-full flex items-center justify-between p-4 bg-wellq-gray/5 dark:bg-white/[0.03] 
                    border border-transparent dark:border-white/5 rounded-2xl 
                    text-sm font-bold text-wellq-dark dark:text-white 
@@ -39,7 +42,7 @@ const LanguageSelector = () => {
                    transition-all cursor-pointer"
       >
         <span className="flex items-center gap-2.5">
-          <Globe size={18} className="text-wellq-cyan" />
+          <Globe size={18} className="text-wellq-cyan" aria-hidden="true" />
           <span>{currentLang.flag} {currentLang.label}</span>
         </span>
         <motion.span
@@ -57,6 +60,8 @@ const LanguageSelector = () => {
             <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
 
             <motion.ul
+              role="listbox"
+              aria-label={t('ux.language')}
               initial={{ opacity: 0, y: -8, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -8, scale: 0.96 }}
@@ -68,7 +73,7 @@ const LanguageSelector = () => {
               {Object.entries(LANGUAGES).map(([key, lang]) => {
                 const isSelected = locale === key;
                 return (
-                  <li key={key}>
+                  <li key={key} role="option" aria-selected={isSelected}>
                     <button
                       type="button"
                       onClick={() => {
@@ -83,7 +88,7 @@ const LanguageSelector = () => {
                                       : 'text-wellq-gray hover:bg-wellq-gray/5 dark:hover:bg-white/[0.05] dark:text-wellq-gray/80 dark:hover:text-white'
                                   }`}
                     >
-                      <span>{lang.flag} {lang.label}</span>
+                      <span lang={key === 'es' ? 'es-CL' : 'en'}>{lang.flag} {lang.label}</span>
                       {isSelected && <Check size={16} className="text-wellq-cyan" strokeWidth={2.5} />}
                     </button>
                   </li>

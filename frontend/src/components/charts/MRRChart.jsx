@@ -11,6 +11,7 @@ const fmt = (val) => {
 };
 
 export const MRRChart = () => {
+  const { t: tx } = useLanguage();
   const { t } = useLanguage();
   const [snapshots, setSnapshots] = useState([]);
   const [loading, setLoading]     = useState(true);
@@ -77,7 +78,7 @@ export const MRRChart = () => {
     <div className="bg-white dark:bg-wellq-dark rounded-2xl p-6 shadow-sm border border-wellq-gray/20 dark:border-wellq-gray/30 flex items-center justify-center h-[500px]">
       <div className="flex flex-col items-center gap-3">
         <div className="w-8 h-8 border-[3px] border-wellq-cyan border-t-transparent rounded-full animate-spin" />
-        <span className="text-xs font-bold text-wellq-gray uppercase tracking-wider">Cargando datos…</span>
+        <span className="text-xs font-bold text-wellq-gray uppercase tracking-wider">{tx('ux.loadingData')}</span>
       </div>
     </div>
   );
@@ -163,7 +164,7 @@ export const MRRChart = () => {
                 <p className="relative text-[10px] font-bold text-red-500 uppercase tracking-wider mb-1">Churn MRR</p>
                 <p className="relative text-3xl font-black text-red-400 tabular-nums tracking-tight">-{fmt(Math.abs(snap.churn ?? 0))}</p>
                 {snap.contraction > 0 && (
-                  <p className="relative text-xs font-semibold text-red-400/70 mt-2">+{fmt(snap.contraction)} contraction</p>
+                  <p className="relative text-xs font-semibold text-red-400/70 mt-2">+{fmt(snap.contraction)} {tx('ux.contraction')}</p>
                 )}
               </div>
             </motion.div>
@@ -294,7 +295,7 @@ export const MRRChart = () => {
             >
               <div className="flex items-center justify-between mb-4">
                 <h4 className="text-sm font-bold text-wellq-dark dark:text-white tracking-tight">
-                  Detail — {snap.period_month} {snap.period_year}
+                  {tx('ux.detail')} {snap.period_month} {snap.period_year}
                 </h4>
               </div>
 

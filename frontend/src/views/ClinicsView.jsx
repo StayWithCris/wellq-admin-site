@@ -183,6 +183,7 @@ const BulkEmailModal = ({ onClose, clinicCount }) => {
 
 // ─── DeleteClinicModal ────────────────────────────────────────────────────────
 const DeleteClinicModal = ({ clinic, onClose, onConfirm, deleting }) => {
+  const { t: tx } = useLanguage();
   if (!clinic) return null;
 
   const isChurned = (clinic.status || '').toLowerCase() === 'churned';
@@ -215,9 +216,9 @@ const DeleteClinicModal = ({ clinic, onClose, onConfirm, deleting }) => {
             </h2>
             <p className="text-sm text-wellq-gray px-2 leading-relaxed">
               {isChurned ? (
-                <>Estás a punto de borrar <strong>{clinic.name}</strong> de forma permanente. Esta acción purgará la base de datos y es absolutamente irreversible.</>
+                <>{tx('ux.youAreAboutToDelete')} <strong>{clinic.name}</strong> {tx('ux.permanentlyThisWillPurgeTheDatabase')}</>
               ) : (
-                <>Estás a punto de dar de baja a <strong>{clinic.name}</strong>. Sus accesos serán suspendidos y pasará a la pestaña de "Churned".</>
+                <>{tx('ux.youAreAboutToDeactivate')} <strong>{clinic.name}</strong>{tx('ux.itsAccessWillBeSuspendedAnd')}</>
               )}
             </p>
           </div>
@@ -228,14 +229,14 @@ const DeleteClinicModal = ({ clinic, onClose, onConfirm, deleting }) => {
               disabled={deleting}
               className="flex-1 px-4 py-2.5 rounded-xl text-sm font-bold text-wellq-dark dark:text-white bg-white dark:bg-white/5 border border-wellq-gray/20 dark:border-white/10 hover:bg-wellq-gray/5 dark:hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-50"
             >
-              Cancelar
+              {tx('ux.cancel')}
             </button>
             <button
               onClick={onConfirm}
               disabled={deleting}
               className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-white rounded-xl text-sm font-bold transition-colors cursor-pointer disabled:opacity-50 shadow-sm ${isChurned ? 'bg-red-600 hover:bg-red-700 shadow-red-500/30' : 'bg-red-500 hover:bg-red-600 shadow-red-500/20'}`}
             >
-              {deleting ? <><Loader2 size={16} className="animate-spin" /> Procesando...</> : (isChurned ? 'Purgar Datos' : 'Mover a Churned')}
+              {deleting ? <><Loader2 size={16} className="animate-spin" /> {tx('ux.processing')}</> : (isChurned ? 'Purgar Datos' : 'Mover a Churned')}
             </button>
           </div>
         </motion.div>
@@ -247,6 +248,7 @@ const DeleteClinicModal = ({ clinic, onClose, onConfirm, deleting }) => {
 
 // ─── CreateClinicModal ────────────────────────────────────────────────────────
 const CreateClinicModal = ({ onClose, onSuccess }) => {
+  const { t: tx } = useLanguage();
   const { t } = useLanguage();
   const [step,     setStep]     = useState(0);
   const [creating, setCreating] = useState(false);
@@ -353,8 +355,8 @@ const CreateClinicModal = ({ onClose, onSuccess }) => {
                 <Plus size={16} className="text-wellq-black" strokeWidth={2.5} />
               </div>
               <div>
-                <h2 className="font-bold text-wellq-dark dark:text-white text-sm leading-tight">Nueva Clínica</h2>
-                <p className="text-xs font-medium text-wellq-gray mt-0.5">Registra una nueva clínica en WellQ</p>
+                <h2 className="font-bold text-wellq-dark dark:text-white text-sm leading-tight">{tx('ux.newClinic')}</h2>
+                <p className="text-xs font-medium text-wellq-gray mt-0.5">{tx('ux.registerANewClinicInWellq')}</p>
               </div>
             </div>
             <button onClick={onClose} className="p-2 hover:bg-wellq-gray/8 dark:hover:bg-white/8 rounded-xl transition-colors cursor-pointer">
@@ -372,15 +374,15 @@ const CreateClinicModal = ({ onClose, onSuccess }) => {
               >
                 <Building2 size={28} className="text-wellq-green" />
               </motion.div>
-              <p className="font-bold text-wellq-dark dark:text-white">¡Clínica creada!</p>
+              <p className="font-bold text-wellq-dark dark:text-white">{tx('ux.clinicCreated')}</p>
               <p className="text-sm text-wellq-gray text-center px-8">
-                <span className="font-semibold text-wellq-dark dark:text-white">{form.name}</span> ha sido registrada y está activa.
+                <span className="font-semibold text-wellq-dark dark:text-white">{form.name}</span> {tx('ux.hasBeenRegisteredAndIsActive')}
               </p>
               <button
                 onClick={onClose}
                 className="mt-2 px-5 py-2 bg-wellq-gray/10 dark:bg-wellq-dark/50 rounded-lg text-sm font-medium text-wellq-dark dark:text-white hover:bg-wellq-gray/20 dark:hover:bg-wellq-dark/80 transition-colors cursor-pointer"
               >
-                Cerrar
+                {tx('ux.close')}
               </button>
             </div>
           ) : (
@@ -407,13 +409,13 @@ const CreateClinicModal = ({ onClose, onSuccess }) => {
                   <div className="p-6 space-y-4">
                     <div>
                       <label className={labelCls}>
-                        Nombre de la Clínica <span className="text-red-400 normal-case">*</span>
+                        {tx('ux.clinicName')} <span className="text-red-400 normal-case">*</span>
                       </label>
                       <input
                         type="text"
                         value={form.name}
                         onChange={(e) => update('name', e.target.value)}
-                        placeholder="Ej: Clínica San Rafael"
+                        placeholder={tx('ux.eGSanRafaelClinic')}
                         className={inputCls}
                         autoFocus
                       />
@@ -432,7 +434,7 @@ const CreateClinicModal = ({ onClose, onSuccess }) => {
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className={labelCls}>Límite Pacientes</label>
+                        <label className={labelCls}>{tx('ux.patientLimit')}</label>
                         <input
                           type="number"
                           min="0"
@@ -456,12 +458,12 @@ const CreateClinicModal = ({ onClose, onSuccess }) => {
                       </div>
                     </div>
                     <div>
-                      <label className={labelCls}>Ubicación</label>
+                      <label className={labelCls}>{tx('ux.location')}</label>
                       <input
                         type="text"
                         value={form.location}
                         onChange={(e) => update('location', e.target.value)}
-                        placeholder="Ej: Santiago, Chile"
+                        placeholder={tx('ux.eGSantiagoChile')}
                         className={inputCls}
                       />
                     </div>
@@ -471,17 +473,17 @@ const CreateClinicModal = ({ onClose, onSuccess }) => {
                 {step === 1 && (
                   <div className="p-6 space-y-4">
                     <div>
-                      <label className={labelCls}>Nombre de Contacto</label>
+                      <label className={labelCls}>{tx('ux.contactName')}</label>
                       <input
                         type="text"
                         value={form.contact_name}
                         onChange={(e) => update('contact_name', e.target.value)}
-                        placeholder="Ej: Ana Martínez"
+                        placeholder={tx('ux.eGAnaMartNez')}
                         className={inputCls}
                       />
                     </div>
                     <div>
-                      <label className={labelCls}>Email de Contacto</label>
+                      <label className={labelCls}>{tx('ux.contactEmail')}</label>
                       <input
                         type="email"
                         value={form.contact_email}
@@ -491,7 +493,7 @@ const CreateClinicModal = ({ onClose, onSuccess }) => {
                       />
                     </div>
                     <div>
-                      <label className={labelCls}>Teléfono</label>
+                      <label className={labelCls}>{tx('ux.phone')}</label>
                       <input
                         type="tel"
                         value={form.contact_phone}
@@ -507,12 +509,12 @@ const CreateClinicModal = ({ onClose, onSuccess }) => {
                 {step === 2 && (
                   <div className="p-6 space-y-4">
                     <div>
-                      <label className={labelCls}>Razón Social</label>
+                      <label className={labelCls}>{tx('ux.legalName')}</label>
                       <input
                         type="text"
                         value={form.company_name}
                         onChange={(e) => update('company_name', e.target.value)}
-                        placeholder="Ej: Clínica San Rafael SpA"
+                        placeholder={tx('ux.eGSanRafaelClinicSpa')}
                         className={inputCls}
                       />
                     </div>
@@ -529,7 +531,7 @@ const CreateClinicModal = ({ onClose, onSuccess }) => {
                         />
                       </div>
                       <div>
-                        <label className={labelCls}>Email Facturación</label>
+                        <label className={labelCls}>{tx('ux.billingEmail')}</label>
                         <input
                           type="email"
                           value={form.billing_email}
@@ -540,21 +542,21 @@ const CreateClinicModal = ({ onClose, onSuccess }) => {
                       </div>
                     </div>
                     <div>
-                      <label className={labelCls}>Dirección</label>
+                      <label className={labelCls}>{tx('ux.address')}</label>
                       <input
                         type="text"
                         value={form.address}
                         onChange={(e) => update('address', e.target.value)}
-                        placeholder="Av. Principal 123, Ciudad"
+                        placeholder={tx('ux.123MainAveCity')}
                         className={inputCls}
                       />
                     </div>
                     <div>
-                      <label className={labelCls}>Notas Internas</label>
+                      <label className={labelCls}>{tx('ux.internalNotes')}</label>
                       <textarea
                         value={form.internal_notes}
                         onChange={(e) => update('internal_notes', e.target.value)}
-                        placeholder="Notas privadas del equipo WellQ..."
+                        placeholder={tx('ux.privateNotesFromTheWellqTeam')}
                         rows={3}
                         className={`${inputCls} resize-none`}
                       />
@@ -633,6 +635,7 @@ const KpiCard = ({ icon: Icon, label, value, colorClass, bgClass, borderClass, r
 
 // ─── ClinicsView Principal ────────────────────────────────────────────────────
 export const ClinicsView = ({ apiClinics, clinicsLoading, onImpersonate, onRefreshClinics, searchQuery = '' }) => {
+  const { t: tx } = useLanguage();
   const { t } = useLanguage();
   const tVal = (val) => (val ? t(`values.${val}`) ?? val : '');
   const canEdit = useHasPermission('clinics.edit');
@@ -1160,7 +1163,7 @@ export const ClinicsView = ({ apiClinics, clinicsLoading, onImpersonate, onRefre
                 {exportState === 'loading'
                   ? <><Loader2 size={14} className="animate-spin" /> {t('clinics.export')}</>
                   : exportState === 'error'
-                  ? <><X size={14} /> Export fallido</>
+                  ? <><X size={14} /> {tx('ux.exportFailed')}</>
                   : <><Download size={14} strokeWidth={2.2} /> {t('clinics.export')}</>
                 }
               </button>
@@ -1200,14 +1203,14 @@ export const ClinicsView = ({ apiClinics, clinicsLoading, onImpersonate, onRefre
                         onChange={(e) => setFilterTier(e.target.value)}
                         className="w-full px-3 py-2 border border-wellq-gray/30 rounded-xl text-sm text-wellq-dark dark:text-white dark:bg-wellq-dark/80 focus:outline-none focus:ring-2 focus:ring-wellq-cyan"
                       >
-                        <option value="">Todos</option>
+                        <option value="">{tx('ux.all')}</option>
                         <option value="trial">Trial</option>
                         <option value="smb">SMB</option>
                         <option value="enterprise">Enterprise</option>
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-wellq-gray uppercase tracking-wider mb-1.5">Estado</label>
+                      <label className="block text-xs font-bold text-wellq-gray uppercase tracking-wider mb-1.5">{tx('ux.status')}</label>
                       <select
                         value={filterStatus}
                         onChange={(e) => setFilterStatus(e.target.value)}
@@ -1318,7 +1321,7 @@ export const ClinicsView = ({ apiClinics, clinicsLoading, onImpersonate, onRefre
 
           <div className="flex items-center justify-between px-6 py-4 border-t border-wellq-gray/10 dark:border-white/5 bg-wellq-gray/3 dark:bg-white/[0.02]">
             <span className="text-xs font-semibold text-wellq-gray">
-              Mostrando <span className="font-bold text-wellq-dark dark:text-white">{filtered.length > 0 ? '1' : '0'}–{filtered.length}</span> de {filtered.length} clínicas
+              {tx('ux.showing')} <span className="font-bold text-wellq-dark dark:text-white">{filtered.length > 0 ? '1' : '0'}–{filtered.length}</span> de {filtered.length} {tx('ux.clinics3')}
             </span>
             <div className="flex items-center gap-1.5">
               <button className="p-1.5 border border-wellq-gray/20 dark:border-wellq-gray/20 rounded-lg text-sm font-medium text-wellq-gray hover:bg-white dark:hover:bg-white/5 transition-colors disabled:opacity-40 cursor-not-allowed" disabled>

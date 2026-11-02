@@ -8,6 +8,7 @@ import { SupportTicketTable } from '../components/support/SupportTicketTable';
 import { SupportTicketDrawer } from '../components/support/SupportTicketDrawer';
 import { CreateTicketModal } from '../components/support/CreateTicketModal';
 import { SupportConfigPanel } from '../components/support/SupportConfigPanel';
+import SlaMonitor from '../components/support/SlaMonitor';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Skeleton } from '../components/ui';
 import useHasPermission from '../hooks/useHasPermission';
@@ -243,6 +244,11 @@ export const SupportView = ({ apiClinics = [], searchQuery = '', onOpenCountChan
         </div>
       </motion.div>
 
+      {/* ── Mejora #13 — Temporizador de SLA ──────────────────────────────── */}
+      <motion.div variants={itemVariants}>
+        <SlaMonitor refreshKey={tickets} onSelectTicket={(id) => setSelected(id)} />
+      </motion.div>
+
       {/* ── Table ──────────────────────────────────────────────────────────── */}
       <motion.div
         variants={itemVariants}
@@ -349,7 +355,9 @@ const MetricCard = ({ label, count, total, meta, loading }) => {
 };
 
 // ─── Resolution Rate Card ─────────────────────────────────────────────────────
-const ResolutionCard = ({ rate, loading }) => (
+const ResolutionCard = ({ rate, loading }) => {
+  const { t: tx } = useLanguage();
+  return ((
   <div className="relative bg-gradient-to-br from-white to-wellq-gray/5 dark:from-wellq-dark dark:to-white/[0.01] rounded-2xl p-5 shadow-sm border border-wellq-gray/20 dark:border-[#1e293b] overflow-hidden group hover:shadow-md transition-all duration-300">
     <div className="absolute top-0 left-0 right-0 h-24 bg-gradient-to-b from-wellq-cyan/10 to-transparent opacity-60 pointer-events-none" />
 
@@ -358,7 +366,7 @@ const ResolutionCard = ({ rate, loading }) => (
         <Zap size={16} className="text-wellq-cyan" strokeWidth={2.2} />
       </div>
       <span className="text-[10px] font-bold bg-wellq-cyan/10 text-wellq-cyan px-2 py-0.5 rounded-md tracking-wider">
-        RATE
+        {tx('ux.rate')}
       </span>
     </div>
 
@@ -373,7 +381,7 @@ const ResolutionCard = ({ rate, loading }) => (
     )}
 
     <p className="relative text-[11px] font-bold uppercase tracking-[0.08em] text-wellq-gray dark:text-wellq-gray/90">
-      Resolution
+      {tx('ux.resolution')}
     </p>
 
     <div className="relative mt-4 h-1.5 bg-black/[0.05] dark:bg-white/[0.05] rounded-full overflow-hidden">
@@ -385,4 +393,5 @@ const ResolutionCard = ({ rate, loading }) => (
       />
     </div>
   </div>
-);
+));
+};

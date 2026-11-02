@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { X, Eye } from 'lucide-react';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 export default function ImpersonateModal({ open, clinic, onClose, onConfirm }) {
+  const { t: tx } = useLanguage();
   const [reason, setReason] = useState('');
 
   if (!open || !clinic) return null;
@@ -29,7 +31,7 @@ export default function ImpersonateModal({ open, clinic, onClose, onConfirm }) {
             <Eye size={18} className="text-white" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-wellq-dark dark:text-white">Impersonate</h3>
+            <h3 className="text-lg font-semibold text-wellq-dark dark:text-white">{tx('ux.impersonate')}</h3>
             <p className="text-sm text-wellq-gray">{clinic.name}</p>
           </div>
         </div>
@@ -37,13 +39,13 @@ export default function ImpersonateModal({ open, clinic, onClose, onConfirm }) {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-wellq-dark dark:text-white mb-1.5">
-              Motivo de acceso (mín. 10 caracteres)
+              {tx('ux.accessReasonMin10Characters')}
             </label>
             <textarea
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               rows={3}
-              placeholder="Ej: Revisar configuración de facturación por solicitud del cliente..."
+              placeholder={tx('ux.eGReviewBillingSettingsAt')}
               className="w-full px-4 py-2.5 border border-wellq-gray/30 rounded-xl text-sm text-wellq-dark dark:text-white dark:bg-wellq-dark/50 focus:outline-none focus:ring-2 focus:ring-wellq-cyan resize-none"
               required
             />
@@ -54,14 +56,14 @@ export default function ImpersonateModal({ open, clinic, onClose, onConfirm }) {
               onClick={onClose}
               className="px-4 py-2 text-sm font-medium text-wellq-gray dark:text-wellq-gray/80 hover:bg-wellq-gray/10 dark:hover:bg-wellq-dark/40 rounded-lg"
             >
-              Cancelar
+              {tx('ux.cancel')}
             </button>
             <button
               type="submit"
               disabled={reason.trim().length < 10}
               className="px-4 py-2 bg-wellq-cyan text-wellq-black text-sm font-medium rounded-lg hover:bg-wellq-cyan/80 disabled:opacity-50 transition-colors"
             >
-              Acceder
+              {tx('ux.access')}
             </button>
           </div>
         </form>

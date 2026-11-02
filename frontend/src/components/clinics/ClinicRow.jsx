@@ -2,6 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Settings, DollarSign, Eye, Trash2 } from 'lucide-react';
 import { StatusBadge, UtilizationBar, HealthBadge } from '../ui';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 const riskStyles = {
   high: 'bg-red-500/10 text-red-500 border-red-500/20',
@@ -28,6 +29,7 @@ export const ClinicRow = ({
   animationDelay = 0,
   canEdit = true,
 }) => {
+  const { t: tx } = useLanguage();
   const prediction = clinic.churnPrediction ?? clinic.churn_prediction;
   const fallbackScore = clinic.healthScore > 0 ? 100 - Number(clinic.healthScore) : 0;
   const riskScore = Math.max(0, Math.min(100, Number(prediction?.risk_score ?? fallbackScore)));
@@ -108,25 +110,25 @@ export const ClinicRow = ({
           <div className="flex items-center gap-1 transition-opacity duration-200">
             <ActionBtn
               icon={Settings}
-              title="Configuracion"
+              title={tx('ux.settings')}
               hoverClass="hover:bg-wellq-gray/10 dark:hover:bg-white/5 hover:text-wellq-dark dark:hover:text-white"
               onClick={(e) => { e.stopPropagation(); onSettings?.(clinic); }}
             />
             <ActionBtn
               icon={DollarSign}
-              title="Facturacion"
+              title={tx('ux.billing')}
               hoverClass="hover:bg-wellq-green/10 hover:text-wellq-green"
               onClick={(e) => { e.stopPropagation(); onInvoices?.(clinic); }}
             />
             <ActionBtn
               icon={Eye}
-              title="Acceso de Soporte"
+              title={tx('ux.supportAccess')}
               hoverClass="hover:bg-amber-500/10 hover:text-amber-500"
               onClick={(e) => { e.stopPropagation(); onImpersonate?.(clinic); }}
             />
             <ActionBtn
               icon={Trash2}
-              title="Eliminar Clinica"
+              title={tx('ux.deleteClinic')}
               hoverClass="hover:bg-red-500/10 hover:text-red-400"
               onClick={(e) => { e.stopPropagation(); onDelete?.(clinic); }}
             />

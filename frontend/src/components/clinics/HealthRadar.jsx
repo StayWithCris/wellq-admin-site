@@ -4,6 +4,7 @@ import {
   RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, Tooltip,
 } from 'recharts';
 import { apiFetch } from '../../api/client';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 // Rec #10 — Radar de salud de 5 ejes por clínica (datos reales desde Neon)
 const LABELS = {
@@ -15,6 +16,7 @@ const LABELS = {
 };
 
 export function HealthRadar({ clinicId }) {
+  const { t: tx } = useLanguage();
   const [state, setState] = useState({ loading: true, error: null, data: null });
 
   useEffect(() => {
@@ -38,15 +40,15 @@ export function HealthRadar({ clinicId }) {
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <RadarIcon size={16} className="text-wellq-cyan" />
-          <h4 className="font-bold text-sm text-wellq-dark dark:text-white">Radar de salud (5 ejes)</h4>
+          <h4 className="font-bold text-sm text-wellq-dark dark:text-white">{tx('ux.healthRadar5Axes')}</h4>
         </div>
         {data?.overall != null && (
-          <span className="text-xs font-black text-wellq-dark dark:text-white">Promedio: {data.overall}</span>
+          <span className="text-xs font-black text-wellq-dark dark:text-white">{tx('ux.average')} {data.overall}</span>
         )}
       </div>
 
       {loading && <div className="flex justify-center py-10"><Loader2 className="animate-spin text-wellq-gray" size={20} /></div>}
-      {error && <p className="text-xs text-red-500">No se pudo cargar el radar de salud.</p>}
+      {error && <p className="text-xs text-red-500">{tx('ux.couldNotLoadTheHealthRadar')}</p>}
 
       {data && (
         <>
