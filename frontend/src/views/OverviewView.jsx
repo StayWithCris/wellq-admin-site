@@ -143,15 +143,18 @@ export const SERVER_STATUS_META = {
 // ─── App Usage Breakdown ──────────────────────────────────────────────────────
 const fmt = (n) => n >= 1000 ? `${(n / 1000).toFixed(1)}K` : (n ?? 0).toLocaleString();
 
-const ContextualSearchEmpty = ({ query }) => (
+const ContextualSearchEmpty = ({ query }) => {
+  const { t: tx } = useLanguage();
+  return ((
   <motion.div variants={itemVariants} className="bg-white dark:bg-wellq-dark rounded-2xl p-10 border border-wellq-gray/20 dark:border-white/5 text-center">
     <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-wellq-gray/10 dark:bg-white/5 flex items-center justify-center">
       <Info size={20} className="text-wellq-gray" />
     </div>
-    <p className="text-sm font-bold text-wellq-dark dark:text-white">Sin resultados</p>
-    <p className="mt-1 text-xs font-medium text-wellq-gray">No hay coincidencias para "{query}" en este apartado.</p>
+    <p className="text-sm font-bold text-wellq-dark dark:text-white">{tx('ux.noResults')}</p>
+    <p className="mt-1 text-xs font-medium text-wellq-gray">{tx('ux.noMatchesFor')}{query}{tx('ux.inThisSection')}</p>
   </motion.div>
-);
+));
+};
 const AppUsageBreakdown = ({ appStats, searchQuery = '' }) => {
   const { t } = useLanguage();
 

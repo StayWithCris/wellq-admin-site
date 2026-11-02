@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { History, Download, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { apiFetch } from '../api/client';
+import { useLanguage } from '../contexts/LanguageContext';
 
 // Rec #16 — Centro de auditoría global (lee action_logs desde Neon)
 const PAGE_SIZE = 25;
@@ -27,6 +28,7 @@ const buildQuery = (f, page, pageSize) => {
 const inputCls = 'w-full rounded-lg border border-wellq-gray/20 dark:border-white/10 bg-transparent px-2.5 py-2 text-xs text-wellq-dark dark:text-white';
 
 export function AuditCenterView() {
+  const { t: tx } = useLanguage();
   const [filters, setFilters] = useState({ action: '', entity_type: '', admin_email: '', q: '', date_from: '', date_to: '' });
   const [applied, setApplied] = useState(filters);
   const [page, setPage] = useState(1);
@@ -80,12 +82,12 @@ export function AuditCenterView() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <History size={18} className="text-wellq-cyan" />
-            <h3 className="font-bold text-sm text-wellq-dark dark:text-white">Centro de auditoría</h3>
-            <span className="text-xs text-wellq-gray">{total} registros</span>
+            <h3 className="font-bold text-sm text-wellq-dark dark:text-white">{tx('ux.auditCenter')}</h3>
+            <span className="text-xs text-wellq-gray">{total} {tx('ux.records')}</span>
           </div>
           <button onClick={exportCsv} disabled={exporting || total === 0}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold bg-wellq-cyan/10 text-wellq-dark dark:text-white border border-wellq-cyan/30 disabled:opacity-50">
-            {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} Exportar CSV
+            {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} {tx('ux.exportCsv')}
           </button>
         </div>
 
@@ -96,29 +98,29 @@ export function AuditCenterView() {
           <select className={inputCls} value={filters.entity_type} onChange={set('entity_type')}>
             {ENTITIES.map((a) => <option key={a} value={a}>{a || 'Toda entidad'}</option>)}
           </select>
-          <input className={inputCls} placeholder="Administrador (correo)" value={filters.admin_email} onChange={set('admin_email')} />
-          <input className={inputCls} placeholder="Nombre o ID" value={filters.q} onChange={set('q')} />
+          <input className={inputCls} placeholder={tx('ux.administratorEmail')} value={filters.admin_email} onChange={set('admin_email')} />
+          <input className={inputCls} placeholder={tx('ux.nameOrId')} value={filters.q} onChange={set('q')} />
           <input type="date" className={inputCls} value={filters.date_from} onChange={set('date_from')} />
           <input type="date" className={inputCls} value={filters.date_to} onChange={set('date_to')} />
           <div className="col-span-2 md:col-span-6 flex gap-2">
-            <button type="submit" className="px-3 py-2 rounded-lg text-xs font-black bg-gradient-to-r from-wellq-cyan to-wellq-blue text-wellq-dark">Filtrar</button>
-            <button type="button" onClick={clear} className="px-3 py-2 rounded-lg text-xs font-bold text-wellq-gray border border-wellq-gray/20">Limpiar</button>
+            <button type="submit" className="px-3 py-2 rounded-lg text-xs font-black bg-gradient-to-r from-wellq-cyan to-wellq-blue text-wellq-dark">{tx('ux.filter')}</button>
+            <button type="button" onClick={clear} className="px-3 py-2 rounded-lg text-xs font-bold text-wellq-gray border border-wellq-gray/20">{tx('ux.clear')}</button>
           </div>
         </form>
       </div>
 
       <div className="bg-white dark:bg-[#0b1017] rounded-2xl p-5 border border-wellq-gray/20 dark:border-[#1e293b]">
         {loading && <div className="flex justify-center py-8"><Loader2 className="animate-spin text-wellq-gray" size={20} /></div>}
-        {error && <p className="text-xs text-red-500">No se pudo cargar el registro de auditoría.</p>}
-        {!loading && !error && items.length === 0 && <p className="text-xs text-wellq-gray">No hay registros con esos filtros.</p>}
+        {error && <p className="text-xs text-red-500">{tx('ux.couldNotLoadTheAuditLog')}</p>}
+        {!loading && !error && items.length === 0 && <p className="text-xs text-wellq-gray">{tx('ux.noRecordsMatchThoseFilters')}</p>}
 
         {items.length > 0 && !loading && (
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-left text-[10px] uppercase text-wellq-gray">
-                  <th className="py-2 pr-3">Fecha</th><th className="pr-3">Administrador</th><th className="pr-3">Acción</th>
-                  <th className="pr-3">Entidad</th><th>Cambios</th>
+                  <th className="py-2 pr-3">{tx('ux.date')}</th><th className="pr-3">{tx('ux.administrator')}</th><th className="pr-3">{tx('ux.action')}</th>
+                  <th className="pr-3">{tx('ux.entity')}</th><th>{tx('ux.changes')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -139,7 +141,7 @@ export function AuditCenterView() {
         {total > PAGE_SIZE && (
           <div className="flex items-center justify-end gap-2 mt-3 text-xs text-wellq-gray">
             <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="p-1 disabled:opacity-40"><ChevronLeft size={16} /></button>
-            <span>Página {page} de {pages}</span>
+            <span>{tx('ux.page')} {page} de {pages}</span>
             <button disabled={page >= pages} onClick={() => setPage((p) => p + 1)} className="p-1 disabled:opacity-40"><ChevronRight size={16} /></button>
           </div>
         )}

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Grid3x3 } from 'lucide-react';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 // Rec #8 — Mapa de calor de cohortes de retención (datos reales desde Neon)
 const cellColor = (pct) => {
@@ -10,6 +11,7 @@ const cellColor = (pct) => {
 };
 
 export default function CohortHeatmapGrid() {
+  const { t: tx } = useLanguage();
   const [state, setState] = useState({ loading: true, error: null, payload: null });
 
   useEffect(() => {
@@ -31,16 +33,16 @@ export default function CohortHeatmapGrid() {
     <div className="bg-white dark:bg-[#0b1017] rounded-2xl p-6 shadow-sm border border-wellq-gray/20 dark:border-[#1e293b]">
       <div className="flex items-center gap-2 mb-1">
         <Grid3x3 size={16} className="text-wellq-cyan" />
-        <h3 className="font-bold text-wellq-dark dark:text-white text-sm">Mapa de calor de retención por cohorte</h3>
+        <h3 className="font-bold text-wellq-dark dark:text-white text-sm">{tx('ux.retentionHeatmapByCohort')}</h3>
       </div>
       <p className="text-[11px] text-wellq-gray mb-4">
-        Cada fila es el mes de alta de las clínicas; cada columna, los meses desde el alta. Los meses futuros quedan vacíos.
+        {tx('ux.eachRowIsTheMonthClinics')}
       </p>
 
       {loading && <div className="h-32 animate-pulse rounded-xl bg-wellq-gray/10" />}
-      {error && <p className="text-xs text-red-500">No se pudo cargar el mapa de cohortes.</p>}
+      {error && <p className="text-xs text-red-500">{tx('ux.couldNotLoadTheCohortHeatmap')}</p>}
       {!loading && !error && rows.length === 0 && (
-        <p className="text-xs text-wellq-gray">Aún no hay clínicas para formar cohortes.</p>
+        <p className="text-xs text-wellq-gray">{tx('ux.thereAreNoClinicsToForm')}</p>
       )}
 
       {rows.length > 0 && (
@@ -48,10 +50,10 @@ export default function CohortHeatmapGrid() {
           <table className="w-full text-xs border-separate border-spacing-1">
             <thead>
               <tr>
-                <th className="text-left text-[10px] uppercase text-wellq-gray font-bold">Cohorte</th>
-                <th className="text-right text-[10px] uppercase text-wellq-gray font-bold">Clínicas</th>
+                <th className="text-left text-[10px] uppercase text-wellq-gray font-bold">{tx('ux.cohort')}</th>
+                <th className="text-right text-[10px] uppercase text-wellq-gray font-bold">{tx('ux.clinics')}</th>
                 {cols.map((m) => (
-                  <th key={m} className="text-center text-[10px] uppercase text-wellq-gray font-bold">Mes {m}</th>
+                  <th key={m} className="text-center text-[10px] uppercase text-wellq-gray font-bold">{tx('ux.month')} {m}</th>
                 ))}
               </tr>
             </thead>

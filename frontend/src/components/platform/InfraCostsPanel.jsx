@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Skeleton } from '../ui';
 import { apiFetch } from '../../api/client';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // InfraCostsPanel — Proyector de costos de infraestructura cloud
@@ -48,6 +49,7 @@ const fade = {
 
 // ── Barra horizontal con etiqueta directa ────────────────────────────────────
 const BarraServicio = ({ label, value, max, total, delay = 0 }) => {
+  const { t: tx } = useLanguage();
   const [hover, setHover] = useState(false);
   const pct   = max > 0 ? (value / max) * 100 : 0;
   const share = total > 0 ? (value / total) * 100 : 0;
@@ -85,7 +87,7 @@ const BarraServicio = ({ label, value, max, total, delay = 0 }) => {
             className="absolute right-0 -top-9 z-20 px-2.5 py-1.5 rounded-lg bg-wellq-dark dark:bg-black
                        text-white text-[11px] font-medium shadow-lg whitespace-nowrap pointer-events-none"
           >
-            {usdFull(value)} · {share.toFixed(1)}% del total
+            {usdFull(value)} · {share.toFixed(1)}{tx('ux.ofTotal')}
           </motion.div>
         )}
       </AnimatePresence>
@@ -95,6 +97,7 @@ const BarraServicio = ({ label, value, max, total, delay = 0 }) => {
 
 // ── Serie mensual de la proyeccion, con umbral de presupuesto ────────────────
 const SerieProyeccion = ({ serie, presupuesto }) => {
+  const { t: tx } = useLanguage();
   const [hover, setHover] = useState(null);
   const max = useMemo(
     () => Math.max(...serie.map((s) => s.costo_estimado_usd), presupuesto || 0) * 1.12,
@@ -110,7 +113,7 @@ const SerieProyeccion = ({ serie, presupuesto }) => {
              style={{ bottom: `calc(${umbralPct}% * 0.82 + 28px)` }}>
           <div className="border-t border-dashed border-slate-400/70 dark:border-slate-500/70" />
           <span className="absolute -top-4 right-0 text-[10px] font-semibold text-wellq-gray">
-            Presupuesto {usdFull(presupuesto)}
+            {tx('ux.budget')} {usdFull(presupuesto)}
           </span>
         </div>
       )}
@@ -129,7 +132,7 @@ const SerieProyeccion = ({ serie, presupuesto }) => {
                     className="absolute -top-2 z-30 px-2.5 py-1.5 rounded-lg bg-wellq-dark dark:bg-black
                                text-white text-[11px] font-medium shadow-lg whitespace-nowrap pointer-events-none"
                   >
-                    Mes {s.mes} · {s.clinicas_acumuladas} clínicas · {usdFull(s.costo_estimado_usd)}
+                    {tx('ux.month')} {s.mes} · {s.clinicas_acumuladas} {tx('ux.clinics2')} {usdFull(s.costo_estimado_usd)}
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -152,13 +155,14 @@ const SerieProyeccion = ({ serie, presupuesto }) => {
           );
         })}
       </div>
-      <p className="text-[10px] text-wellq-gray text-center mt-1">Mes de la proyección</p>
+      <p className="text-[10px] text-wellq-gray text-center mt-1">{tx('ux.projectionMonth')}</p>
     </div>
   );
 };
 
 // ── Panel principal ──────────────────────────────────────────────────────────
 export const InfraCostsPanel = () => {
+  const { t: tx } = useLanguage();
   const [actual, setActual]   = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(null);
@@ -230,7 +234,7 @@ export const InfraCostsPanel = () => {
                       border border-red-200/60 dark:border-red-500/20">
         <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
           <AlertTriangle size={18} strokeWidth={2.2} />
-          <span className="text-sm font-semibold">No se pudo cargar el costo de infraestructura</span>
+          <span className="text-sm font-semibold">{tx('ux.couldNotLoadTheInfrastructureCost')}</span>
         </div>
         <p className="text-xs text-wellq-gray mt-1.5">{error}</p>
       </div>
@@ -244,11 +248,10 @@ export const InfraCostsPanel = () => {
                       border border-slate-200 dark:border-white/10">
         <div className="flex items-center gap-2 text-wellq-gray">
           <Info size={18} strokeWidth={2.2} />
-          <span className="text-sm font-semibold">Sin registros de costo todavía</span>
+          <span className="text-sm font-semibold">{tx('ux.noCostRecordsYet')}</span>
         </div>
         <p className="text-xs text-wellq-gray mt-1.5">
-          Ejecuta <code className="px-1 py-0.5 rounded bg-slate-100 dark:bg-white/10">python seed.py</code> para
-          cargar los períodos de prueba.
+          {tx('ux.run')} <code className="px-1 py-0.5 rounded bg-slate-100 dark:bg-white/10">python seed.py</code> {tx('ux.toLoadTheSamplePeriods')}
         </p>
       </div>
     );
@@ -271,7 +274,7 @@ export const InfraCostsPanel = () => {
           </div>
           <div>
             <h3 className="text-sm font-bold text-wellq-dark dark:text-white">
-              Costo de Infraestructura
+              {tx('ux.infrastructureCost')}
             </h3>
             <p className="text-[11px] text-wellq-gray">{actual.period}</p>
           </div>
@@ -309,7 +312,7 @@ export const InfraCostsPanel = () => {
           />
         </div>
         <p className="mt-1.5 text-[11px] font-semibold text-wellq-gray tabular-nums">
-          {actual.budget_used_percent}% del presupuesto consumido
+          {actual.budget_used_percent}{tx('ux.ofBudgetUsed')}
         </p>
       </div>
 
@@ -317,7 +320,7 @@ export const InfraCostsPanel = () => {
       {desglose.length > 0 && (
         <div className="relative mb-6">
           <p className="text-[11px] font-bold text-wellq-gray uppercase tracking-wider mb-3">
-            Desglose por servicio
+            {tx('ux.breakdownByService')}
           </p>
           <div className="space-y-3">
             {desglose.map((s, i) => (
@@ -333,13 +336,13 @@ export const InfraCostsPanel = () => {
         <div className="flex items-center gap-2 mb-3">
           <Calculator size={14} strokeWidth={2.2} className="text-wellq-gray" />
           <p className="text-[11px] font-bold text-wellq-gray uppercase tracking-wider">
-            Proyección de costo
+            {tx('ux.costProjection')}
           </p>
         </div>
 
         <div className="flex flex-wrap items-end gap-3 mb-4">
           <label className="flex flex-col gap-1">
-            <span className="text-[10px] font-semibold text-wellq-gray">Clínicas adicionales</span>
+            <span className="text-[10px] font-semibold text-wellq-gray">{tx('ux.additionalClinics')}</span>
             <input type="number" min="0" max="10000" value={clinicas}
               onChange={(e) => setClinicas(e.target.value)}
               className="w-28 px-2.5 py-1.5 rounded-lg text-sm tabular-nums
@@ -349,7 +352,7 @@ export const InfraCostsPanel = () => {
           </label>
 
           <label className="flex flex-col gap-1">
-            <span className="text-[10px] font-semibold text-wellq-gray">Meses</span>
+            <span className="text-[10px] font-semibold text-wellq-gray">{tx('ux.months')}</span>
             <input type="number" min="1" max="36" value={meses}
               onChange={(e) => setMeses(e.target.value)}
               className="w-20 px-2.5 py-1.5 rounded-lg text-sm tabular-nums
@@ -392,7 +395,7 @@ export const InfraCostsPanel = () => {
                                 bg-red-500/10 text-red-600 dark:text-red-400">
                   <AlertTriangle size={14} strokeWidth={2.4} className="mt-0.5 shrink-0" />
                   <p className="text-xs font-medium">
-                    La proyección supera el presupuesto a partir del mes {proy.alerta_presupuesto.mes_excede}.
+                    {tx('ux.theProjectionExceedsTheBudgetStarting')} {proy.alerta_presupuesto.mes_excede}.
                   </p>
                 </div>
               )}
@@ -401,8 +404,7 @@ export const InfraCostsPanel = () => {
                                presupuesto={proy.linea_base.presupuesto_usd} />
 
               <p className="text-[10px] text-wellq-gray mt-3 leading-relaxed">
-                Tarifas y supuestos de consumo son parámetros de calibración. Deben validarse
-                contra la factura real de Google Cloud y Neon antes de usarse para decidir.
+                {tx('ux.ratesAndUsageAssumptionsAreCalibration')}
               </p>
             </motion.div>
           )}

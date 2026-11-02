@@ -5,12 +5,15 @@ import App from './App.jsx'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { LanguageProvider } from './contexts/LanguageContext'
 import { Toaster } from 'sonner'   // ← nuevo
+import { MotionConfig } from 'framer-motion'   // Mejora #24 — respeta 'reducir movimiento'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <ThemeProvider>
       <LanguageProvider>
-        <App />
+        <MotionConfig reducedMotion="user">
+          <App />
+        </MotionConfig>
         <Toaster
           position="bottom-right"
           toastOptions={{

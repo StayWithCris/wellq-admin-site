@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { Sparkles, CheckCircle2, Clock, AlertTriangle } from "lucide-react";
+import { useLanguage } from '../../contexts/LanguageContext';
 
 export default function SoapQualityWidget() {
+  const { t: tx } = useLanguage();
   const [metrics, setMetrics] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -38,7 +40,7 @@ export default function SoapQualityWidget() {
   if (!metrics) {
     return (
       <div className="bg-[#111c2e] p-6 rounded-xl border border-slate-800 text-slate-400">
-        No hay registros de calidad SOAP disponibles en el sistema.
+        {tx('ux.noSoapQualityRecordsAreAvailable')}
       </div>
     );
   }
@@ -49,7 +51,7 @@ export default function SoapQualityWidget() {
         <div className="flex items-center gap-2">
           <Sparkles className="text-emerald-400 w-5 h-5" />
           <h3 className="font-semibold text-base tracking-wide text-slate-200">
-            AI SOAP Quality
+            {tx('ux.aiSoapQuality')}
           </h3>
         </div>
         <span className="text-xs uppercase px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
@@ -63,7 +65,7 @@ export default function SoapQualityWidget() {
             {metrics.acceptance_rate_percentage}%
           </span>
           <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-            Acceptance Rate
+            {tx('ux.acceptanceRate')}
           </span>
         </div>
         <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
@@ -78,7 +80,7 @@ export default function SoapQualityWidget() {
         <div className="flex items-center justify-between p-3 rounded-lg bg-slate-900/60 border border-slate-800">
           <div className="flex items-center gap-2 text-slate-400 text-sm">
             <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-            <span>Notas generadas</span>
+            <span>{tx('ux.notesGenerated')}</span>
           </div>
           <span className="font-semibold text-slate-100">
             {metrics.total_notes_generated?.toLocaleString()}
@@ -88,7 +90,7 @@ export default function SoapQualityWidget() {
         <div className="flex items-center justify-between p-3 rounded-lg bg-slate-900/60 border border-slate-800">
           <div className="flex items-center gap-2 text-slate-400 text-sm">
             <AlertTriangle className="w-4 h-4 text-amber-400" />
-            <span>Requieren edición</span>
+            <span>{tx('ux.requireEditing')}</span>
           </div>
           <span className="font-semibold text-amber-400">
             {metrics.edits_required_percentage}%
@@ -98,10 +100,10 @@ export default function SoapQualityWidget() {
         <div className="flex items-center justify-between p-3 rounded-lg bg-slate-900/60 border border-slate-800">
           <div className="flex items-center gap-2 text-slate-400 text-sm">
             <Clock className="w-4 h-4 text-blue-400" />
-            <span>Tiempo ahorrado</span>
+            <span>{tx('ux.timeSaved')}</span>
           </div>
           <span className="font-semibold text-blue-400">
-            {metrics.average_time_saved_minutes_per_note} min/nota
+            {metrics.average_time_saved_minutes_per_note} {tx('ux.minNote')}
           </span>
         </div>
       </div>
@@ -109,7 +111,7 @@ export default function SoapQualityWidget() {
       {metrics.common_corrections && (
         <div className="mt-4 p-3 bg-slate-900/40 rounded-lg border border-slate-800/80">
           <span className="text-xs font-medium text-slate-400 block mb-1">
-            Correcciones frecuentes:
+            {tx('ux.frequentCorrections')}
           </span>
           <p className="text-xs text-slate-300 italic">
             {metrics.common_corrections}

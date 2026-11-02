@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 
 import { API_BASE } from '../api/client';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const fmtNumber = (value) => Number(value ?? 0).toLocaleString('es-CL');
 
@@ -74,6 +75,7 @@ function LoadingView() {
 }
 
 export default function ClinicPortalPage() {
+  const { t: tx } = useLanguage();
   const [clinic, setClinic] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -134,7 +136,7 @@ export default function ClinicPortalPage() {
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Shield size={16} strokeWidth={2.5} />
-            <span className="text-xs font-black uppercase tracking-widest">Acceso de soporte</span>
+            <span className="text-xs font-black uppercase tracking-widest">{tx('ux.supportAccess')}</span>
             {clinic && <span className="text-sm font-bold">{clinic.name}</span>}
           </div>
           <button
@@ -142,7 +144,7 @@ export default function ClinicPortalPage() {
             className="flex items-center gap-1.5 rounded-lg bg-amber-950/15 px-3 py-1 text-xs font-bold hover:bg-amber-950/25"
           >
             <X size={13} strokeWidth={2.5} />
-            Cerrar
+            {tx('ux.close')}
           </button>
         </div>
       </div>
@@ -152,7 +154,7 @@ export default function ClinicPortalPage() {
           <div>
             <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#16f8f9]">
               <Activity size={14} />
-              Portal read-only
+              {tx('ux.readOnlyPortal')}
             </div>
             <h1 className="text-3xl font-black tracking-tight text-white">
               {clinic?.name || 'Portal de clinica'}
@@ -178,7 +180,7 @@ export default function ClinicPortalPage() {
           <div className="mb-6 flex items-start gap-3 rounded-2xl border border-red-400/25 bg-red-400/10 p-4 text-red-200">
             <AlertTriangle className="mt-0.5 shrink-0 text-red-400" size={18} />
             <div>
-              <p className="font-bold">No se pudo abrir el portal</p>
+              <p className="font-bold">{tx('ux.couldNotOpenThePortal')}</p>
               <p className="mt-1 text-sm text-red-200/80">{error}</p>
             </div>
           </div>
@@ -191,28 +193,28 @@ export default function ClinicPortalPage() {
             <section className="grid gap-4 md:grid-cols-4">
               <StatCard
                 icon={Users}
-                label="Pacientes"
+                label={tx('ux.patients')}
                 value={`${fmtNumber(clinic.patients_used)} / ${fmtNumber(clinic.patients_limit)}`}
                 detail={`${usagePct}% de uso`}
                 tone={usagePct >= 90 ? 'amber' : 'cyan'}
               />
               <StatCard
                 icon={Stethoscope}
-                label="Clinicos activos"
+                label={tx('ux.activeClinicians')}
                 value={`${fmtNumber(clinic.clinicians?.active)} / ${fmtNumber(clinic.clinicians?.total)}`}
                 detail={(clinic.clinicians?.specialties || []).join(', ')}
                 tone="blue"
               />
               <StatCard
                 icon={CheckCircle2}
-                label="Health score"
+                label={tx('ux.healthScore')}
                 value={`${fmtNumber(clinic.health_score)}%`}
                 detail="Estado operacional"
                 tone={clinic.health_score >= 80 ? 'green' : 'amber'}
               />
               <StatCard
                 icon={Zap}
-                label="Actividad IA"
+                label={tx('ux.aiActivity')}
                 value={fmtNumber(clinic.usage?.ai_processing_minutes)}
                 detail="minutos procesados"
                 tone="cyan"
@@ -223,27 +225,27 @@ export default function ClinicPortalPage() {
               <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
                 <div className="mb-4 flex items-center gap-2">
                   <Building2 size={17} className="text-[#16f8f9]" />
-                  <h2 className="text-sm font-black uppercase tracking-wide text-white">Datos de la clinica</h2>
+                  <h2 className="text-sm font-black uppercase tracking-wide text-white">{tx('ux.clinicDetails')}</h2>
                 </div>
                 <div className="grid gap-3 md:grid-cols-2">
-                  <InfoField label="Razon social" value={clinic.company_name} />
+                  <InfoField label={tx('ux.legalName')} value={clinic.company_name} />
                   <InfoField label="RUT / Tax ID" value={clinic.tax_id} />
-                  <InfoField label="Direccion" value={clinic.address || clinic.location} />
+                  <InfoField label={tx('ux.address')} value={clinic.address || clinic.location} />
                   <InfoField label="MRR" value={clinic.mrr ? `$${fmtNumber(clinic.mrr)} USD` : '-'} />
-                  <InfoField label="Ultimo login" value={fmtDate(clinic.last_login)} />
-                  <InfoField label="Creada" value={fmtDate(clinic.created_at)} />
+                  <InfoField label={tx('ux.lastLogin')} value={fmtDate(clinic.last_login)} />
+                  <InfoField label={tx('ux.created')} value={fmtDate(clinic.created_at)} />
                 </div>
               </div>
 
               <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
                 <div className="mb-4 flex items-center gap-2">
                   <Mail size={17} className="text-[#16f8f9]" />
-                  <h2 className="text-sm font-black uppercase tracking-wide text-white">Contacto</h2>
+                  <h2 className="text-sm font-black uppercase tracking-wide text-white">{tx('ux.contact')}</h2>
                 </div>
                 <div className="space-y-3">
-                  <InfoField label="Nombre" value={clinic.contact_name} />
+                  <InfoField label={tx('ux.name')} value={clinic.contact_name} />
                   <InfoField label="Email" value={clinic.contact_email || clinic.billing_email} />
-                  <InfoField label="Telefono" value={clinic.contact_phone} />
+                  <InfoField label={tx('ux.phone')} value={clinic.contact_phone} />
                 </div>
               </div>
             </section>
@@ -252,7 +254,7 @@ export default function ClinicPortalPage() {
               <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
                 <div className="mb-4 flex items-center gap-2">
                   <Users size={17} className="text-[#16f8f9]" />
-                  <h2 className="text-sm font-black uppercase tracking-wide text-white">Salud de pacientes</h2>
+                  <h2 className="text-sm font-black uppercase tracking-wide text-white">{tx('ux.patientHealth')}</h2>
                 </div>
                 <div className="space-y-3">
                   {healthRows.map(([label, value, color]) => (
@@ -267,12 +269,12 @@ export default function ClinicPortalPage() {
               <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
                 <div className="mb-4 flex items-center gap-2">
                   <Calendar size={17} className="text-[#16f8f9]" />
-                  <h2 className="text-sm font-black uppercase tracking-wide text-white">Uso del mes</h2>
+                  <h2 className="text-sm font-black uppercase tracking-wide text-white">{tx('ux.usageThisMonth')}</h2>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <InfoField label="Citas" value={fmtNumber(clinic.usage?.appointments_this_month)} />
-                  <InfoField label="Notas SOAP" value={fmtNumber(clinic.usage?.notes_generated)} />
-                  <InfoField label="Ejercicios" value={fmtNumber(clinic.usage?.exercises_assigned)} />
+                  <InfoField label={tx('ux.appointments')} value={fmtNumber(clinic.usage?.appointments_this_month)} />
+                  <InfoField label={tx('ux.soapNotes')} value={fmtNumber(clinic.usage?.notes_generated)} />
+                  <InfoField label={tx('ux.exercises')} value={fmtNumber(clinic.usage?.exercises_assigned)} />
                   <InfoField label="API calls" value={fmtNumber(clinic.usage?.api_calls)} />
                 </div>
               </div>
@@ -281,7 +283,7 @@ export default function ClinicPortalPage() {
             <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-amber-400/20 bg-amber-400/10 px-5 py-4 text-sm text-amber-100">
               <Clock size={16} className="text-amber-300" />
               <span>
-                Sesion solo lectura iniciada por {clinic.session?.admin_email || 'admin'}.
+                {tx('ux.readOnlySessionStartedBy')} {clinic.session?.admin_email || 'admin'}.
               </span>
             </div>
           </div>

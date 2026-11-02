@@ -705,6 +705,7 @@ const EmptyState = ({ label }) => (
 
 // ─── Pagination ───────────────────────────────────────────────────────────────
 const Pagination = ({ page, totalPages, total, pageSize, onPageChange, t }) => {
+  const { t: tx } = useLanguage();
   const start = (page - 1) * pageSize + 1;
   const end   = Math.min(page * pageSize, total);
 
@@ -737,7 +738,7 @@ const Pagination = ({ page, totalPages, total, pageSize, onPageChange, t }) => {
           onClick={() => onPageChange?.(page - 1)}
           disabled={page <= 1}
           className={btnNav}
-          aria-label="Previous page"
+          aria-label={tx('ux.previousPage')}
         >
           <ChevronLeft size={16} strokeWidth={2.5} />
         </button>
@@ -760,7 +761,7 @@ const Pagination = ({ page, totalPages, total, pageSize, onPageChange, t }) => {
           onClick={() => onPageChange?.(page + 1)}
           disabled={page >= totalPages}
           className={btnNav}
-          aria-label="Next page"
+          aria-label={tx('ux.nextPage')}
         >
           <ChevronRight size={16} strokeWidth={2.5} />
         </button>

@@ -211,6 +211,7 @@ const ErrorBanner = ({ message, onRetry, errorLabel, retryLabel }) => (
 // overflow/z-index del árbol de componentes padre. Mismo patrón que
 // "Force Update Options" en AnalyticsView.
 const PlanActionOverlay = ({ open, type, plan, onConfirm, onCancel }) => {
+  const { t: tx } = useLanguage();
   const { t } = useLanguage(); // 🐛 BUG FIX AQUÍ: Faltaba inicializar el hook
   const isDelete = type === 'delete';
   const activeClinics   = plan?.metrics?.activeClinics   ?? 0;
@@ -308,14 +309,14 @@ const PlanActionOverlay = ({ open, type, plan, onConfirm, onCancel }) => {
                         ? 'bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400'
                         : 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400'
                     }`}>
-                      Impacto detectado
+                      {tx('ux.impactDetected')}
                     </div>
                     <div className="px-4 py-3.5 space-y-3 bg-white dark:bg-white/[0.015]">
                       {activeClinics > 0 && (
                         <div className="flex items-center justify-between">
                           <span className="flex items-center gap-2 text-sm font-semibold text-wellq-dark dark:text-white">
                             <AlertTriangle size={13} className={isDelete ? 'text-red-400' : 'text-amber-400'} />
-                            Clínicas activas en este plan
+                            {tx('ux.activeClinicsOnThisPlan')}
                           </span>
                           <span className={`text-sm font-black tabular-nums ${
                             isDelete ? 'text-red-500' : 'text-amber-500'
@@ -337,7 +338,7 @@ const PlanActionOverlay = ({ open, type, plan, onConfirm, onCancel }) => {
                       {isDelete && historicalClinics > 0 && (
                         <div className="flex items-center justify-between border-t border-wellq-gray/10 dark:border-white/5 pt-3">
                           <span className="text-sm font-semibold text-wellq-dark dark:text-white">
-                            Historial total (activas + pasadas)
+                            {tx('ux.totalHistoryActivePast')}
                           </span>
                           <span className="text-sm font-black tabular-nums text-wellq-gray">
                             {historicalClinics}
@@ -366,14 +367,14 @@ const PlanActionOverlay = ({ open, type, plan, onConfirm, onCancel }) => {
                     onClick={onCancel}
                     className="flex-1 px-4 py-2.5 rounded-xl border border-wellq-gray/20 dark:border-white/10 text-sm font-bold text-wellq-gray hover:text-wellq-dark dark:hover:text-white hover:bg-wellq-gray/5 dark:hover:bg-white/5 transition-colors"
                   >
-                    Cancelar
+                    {tx('ux.cancel')}
                   </button>
 
                   {isDelete && !canHardDelete ? (
                     // Bloqueado: hay historial → mostrar botón deshabilitado
                     <div className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-wellq-gray/40 dark:text-white/20 bg-wellq-gray/5 dark:bg-white/[0.02] cursor-not-allowed select-none border border-wellq-gray/10 dark:border-white/5">
                       <AlertTriangle size={14} />
-                      Eliminar (bloqueado)
+                      {tx('ux.deleteBlocked')}
                     </div>
                   ) : (
                     <button
@@ -385,8 +386,8 @@ const PlanActionOverlay = ({ open, type, plan, onConfirm, onCancel }) => {
                       }`}
                     >
                       {isDelete
-                        ? <><Trash2 size={15} /> Eliminar plan</>
-                        : <><Archive size={15} /> Archivar plan</>
+                        ? <><Trash2 size={15} /> {tx('ux.deletePlan')}</>
+                        : <><Archive size={15} /> {tx('ux.archivePlan')}</>
                       }
                     </button>
                   )}
@@ -597,6 +598,7 @@ const ArchivedPlanCard = ({ plan, onRestore }) => {
 
 // ─── ArchivedPlansView (NUEVO) ────────────────────────────────────────────────
 const ArchivedPlansView = ({ plans, loading, error, onReload, onRestore, searchQuery = '' }) => {
+  const { t: tx } = useLanguage();
   const { t, tVal } = useLanguage();
   const filteredPlans = filterAndSortBySearch(plans, searchQuery, (plan) => getPlanSearchValues(plan, {}, tVal));
   const totalArchived     = filteredPlans.length;
@@ -657,7 +659,7 @@ const ArchivedPlansView = ({ plans, loading, error, onReload, onRestore, searchQ
           <div className={`text-[10px] font-bold uppercase tracking-wider mb-2 ${
             totalArrAtRisk > 0 ? 'text-red-600 dark:text-red-400' : 'text-wellq-gray'
           }`}>
-            ARR en riesgo
+            {tx('ux.arrAtRisk')}
           </div>
           <div className={`text-3xl font-black tabular-nums ${
             totalArrAtRisk > 0 ? 'text-red-600 dark:text-red-400' : 'text-wellq-dark dark:text-white'

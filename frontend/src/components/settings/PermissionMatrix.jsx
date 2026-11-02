@@ -1,10 +1,12 @@
 import React from 'react';
 import { Check, Minus } from 'lucide-react';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 // Rec #17 — Matriz visual de permisos (roles × permisos, agrupados por módulo). Solo lectura.
 export default function PermissionMatrix({ roles = [], permissions = [] }) {
+  const { t } = useLanguage();
   if (!roles.length || !permissions.length) {
-    return <p className="text-sm text-wellq-gray py-8 text-center">No hay roles o permisos para mostrar.</p>;
+    return <p className="text-sm text-wellq-gray py-8 text-center">{t('recs.noRolesPerms')}</p>;
   }
 
   const byModule = permissions.reduce((acc, p) => {
@@ -20,7 +22,7 @@ export default function PermissionMatrix({ roles = [], permissions = [] }) {
       <table className="min-w-full text-sm">
         <thead>
           <tr className="bg-wellq-gray/5 dark:bg-white/[0.03]">
-            <th className="text-left px-4 py-3 font-black text-wellq-dark dark:text-white sticky left-0 bg-inherit">Permiso</th>
+            <th className="text-left px-4 py-3 font-black text-wellq-dark dark:text-white sticky left-0 bg-inherit">{t('recs.permission')}</th>
             {roles.map((r) => (
               <th key={r.id} className="px-4 py-3 text-center font-bold text-wellq-dark dark:text-white whitespace-nowrap">
                 {r.name}
@@ -45,8 +47,8 @@ export default function PermissionMatrix({ roles = [], permissions = [] }) {
                   {roles.map((r) => (
                     <td key={r.id} className="px-4 py-2 text-center">
                       {has(r, p.key)
-                        ? <Check size={16} className="inline text-green-500" aria-label="Permitido" />
-                        : <Minus size={16} className="inline text-wellq-gray/40" aria-label="No permitido" />}
+                        ? <Check size={16} className="inline text-green-500" aria-label={t('recs.allowed')} />
+                        : <Minus size={16} className="inline text-wellq-gray/40" aria-label={t('recs.notAllowed')} />}
                     </td>
                   ))}
                 </tr>

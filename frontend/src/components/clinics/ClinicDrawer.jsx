@@ -12,6 +12,7 @@ import { apiFetch, API_BASE } from '../../api/client';
 import { PatientHealthSection } from './PatientHealthSection';
 import { HealthRadar } from './HealthRadar';
 import { AuditTimeline } from './AuditTimeline';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 // ─── Animaciones Coreografiadas (Estilo Analytics) ───────────────────────────
 const itemVariants = {
@@ -77,6 +78,7 @@ const TabBtn = ({ active, onClick, icon: Icon, label }) => (
 
 // ─── NUEVO: Modal de Contacto para clínica individual ─────────────────────────
 const ContactClinicModal = ({ clinic, contact, onClose }) => {
+  const { t: tx } = useLanguage();
   const [subject, setSubject] = useState(`WellQ - ${clinic?.name ?? ''}`);
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
@@ -133,7 +135,7 @@ const ContactClinicModal = ({ clinic, contact, onClose }) => {
               <Mail size={16} className="text-wellq-black" strokeWidth={2.2} />
             </div>
             <div>
-              <h2 className="font-bold text-wellq-dark dark:text-white text-sm leading-tight">Contactar Clínica</h2>
+              <h2 className="font-bold text-wellq-dark dark:text-white text-sm leading-tight">{tx('ux.contactClinic')}</h2>
               <p className="text-xs font-medium text-wellq-gray mt-0.5 truncate max-w-[200px]">{clinic?.name}</p>
             </div>
           </div>
@@ -152,13 +154,13 @@ const ContactClinicModal = ({ clinic, contact, onClose }) => {
             >
               <Send size={28} className="text-wellq-green" />
             </motion.div>
-            <p className="font-bold text-wellq-dark dark:text-white">¡Email enviado!</p>
-            <p className="text-sm text-wellq-gray">Mensaje en cola de envío.</p>
+            <p className="font-bold text-wellq-dark dark:text-white">{tx('ux.emailSent')}</p>
+            <p className="text-sm text-wellq-gray">{tx('ux.messageQueuedForDelivery')}</p>
             <button
               onClick={onClose}
               className="mt-2 px-5 py-2 bg-wellq-gray/10 dark:bg-wellq-dark/50 rounded-lg text-sm font-medium text-wellq-dark dark:text-white hover:bg-wellq-gray/20 dark:hover:bg-wellq-dark/80 transition-colors cursor-pointer"
             >
-              Cerrar
+              {tx('ux.close')}
             </button>
           </div>
         ) : (
@@ -174,7 +176,7 @@ const ContactClinicModal = ({ clinic, contact, onClose }) => {
             )}
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-wellq-gray uppercase tracking-wider mb-1.5">Asunto</label>
+                <label className="block text-xs font-semibold text-wellq-gray uppercase tracking-wider mb-1.5">{tx('ux.subject')}</label>
                 <input
                   type="text"
                   value={subject}
@@ -183,11 +185,11 @@ const ContactClinicModal = ({ clinic, contact, onClose }) => {
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-wellq-gray uppercase tracking-wider mb-1.5">Mensaje</label>
+                <label className="block text-xs font-semibold text-wellq-gray uppercase tracking-wider mb-1.5">{tx('ux.message')}</label>
                 <textarea
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  placeholder="Escribe tu mensaje aquí..."
+                  placeholder={tx('ux.writeYourMessageHere')}
                   rows={4}
                   className="w-full px-4 py-2.5 border border-wellq-gray/30 rounded-xl text-sm text-wellq-dark dark:text-white placeholder-wellq-gray/40 focus:outline-none focus:ring-2 focus:ring-wellq-cyan focus:border-transparent transition-all resize-none dark:bg-wellq-dark/50"
                 />
@@ -199,7 +201,7 @@ const ContactClinicModal = ({ clinic, contact, onClose }) => {
                 onClick={onClose}
                 className="px-4 py-2 border border-wellq-gray/30 rounded-lg text-sm font-medium text-wellq-dark dark:text-white hover:bg-wellq-gray/10 dark:hover:bg-wellq-dark/40 transition-colors cursor-pointer"
               >
-                Cancelar
+                {tx('ux.cancel')}
               </button>
               <button
                 onClick={handleSend}
@@ -207,8 +209,8 @@ const ContactClinicModal = ({ clinic, contact, onClose }) => {
                 className="flex items-center gap-2 px-5 py-2 bg-wellq-cyan text-wellq-black rounded-lg text-sm font-medium hover:bg-wellq-cyan/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-sm shadow-wellq-cyan/20"
               >
                 {sending
-                  ? <><Loader2 size={15} className="animate-spin" /> Enviando...</>
-                  : <><Send size={15} /> Enviar Email</>
+                  ? <><Loader2 size={15} className="animate-spin" /> {tx('ux.sending')}</>
+                  : <><Send size={15} /> {tx('ux.sendEmail')}</>
                 }
               </button>
             </div>
@@ -233,6 +235,7 @@ export const ClinicDrawer = ({
   onClose,
   canEdit = true,   // ← RBAC: false → oculta acciones de escritura
 }) => {
+  const { t: tx } = useLanguage();
   const [activeTab,     setActiveTab]    = useState(mode);
   const [subscription, setSubscription] = useState(null);
   const [license,      setLicense]      = useState(null);
@@ -901,11 +904,11 @@ export const ClinicDrawer = ({
 
           {/* Tabs de Navegación — Settings e Invoices ocultos para roles de solo lectura */}
           <div className="flex items-center gap-7">
-            <TabBtn active={activeTab === 'overview'}  onClick={() => setActiveTab('overview')}  label="Overview" />
+            <TabBtn active={activeTab === 'overview'}  onClick={() => setActiveTab('overview')}  label={tx('ux.overview')} />
             {canEdit && (
               <>
-                <TabBtn active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={SettingsIcon} label="Settings" />
-                <TabBtn active={activeTab === 'invoices'}  onClick={() => setActiveTab('invoices')}  icon={Receipt}      label="Invoices" />
+                <TabBtn active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={SettingsIcon} label={tx('ux.settings')} />
+                <TabBtn active={activeTab === 'invoices'}  onClick={() => setActiveTab('invoices')}  icon={Receipt}      label={tx('ux.invoices')} />
               </>
             )}
           </div>
@@ -929,12 +932,12 @@ export const ClinicDrawer = ({
                 <motion.section variants={itemVariants}>
                   <div className="flex items-center gap-2 mb-3 px-1">
                     <User size={14} className="text-wellq-cyan" />
-                    <h3 className="text-xs font-bold text-wellq-dark dark:text-white uppercase tracking-wider">Contact Info</h3>
+                    <h3 className="text-xs font-bold text-wellq-dark dark:text-white uppercase tracking-wider">{tx('ux.contactInfo')}</h3>
                   </div>
                   <div className="bg-white dark:bg-wellq-dark border border-wellq-gray/15 dark:border-white/5 rounded-2xl px-5 py-2 shadow-sm">
-                    <InfoRow icon={User}  label="Decision Maker" value={contact?.contact_info?.primary_name  ?? '—'} />
+                    <InfoRow icon={User}  label={tx('ux.decisionMaker')} value={contact?.contact_info?.primary_name  ?? '—'} />
                     <InfoRow icon={Mail}  label="Email"          value={contact?.contact_info?.primary_email ?? '—'} accent />
-                    <InfoRow icon={Phone} label="Phone"          value={contact?.contact_info?.primary_phone ?? '—'} />
+                    <InfoRow icon={Phone} label={tx('ux.phone')}          value={contact?.contact_info?.primary_phone ?? '—'} />
                   </div>
                 </motion.section>
 
@@ -942,11 +945,11 @@ export const ClinicDrawer = ({
                 <motion.section variants={itemVariants}>
                   <div className="flex items-center gap-2 mb-3 px-1">
                     <CreditCard size={14} className="text-wellq-green" />
-                    <h3 className="text-xs font-bold text-wellq-dark dark:text-white uppercase tracking-wider">Subscription</h3>
+                    <h3 className="text-xs font-bold text-wellq-dark dark:text-white uppercase tracking-wider">{tx('ux.subscription')}</h3>
                   </div>
                   <div className="bg-white dark:bg-wellq-dark border border-wellq-gray/15 dark:border-white/5 rounded-2xl px-5 py-2 shadow-sm">
-                    <InfoRow icon={CreditCard} label="Current Plan"   value={subscription?.plan_name ?? clinic.tier ?? '—'} />
-                    <InfoRow icon={TrendingUp} label="Contract Value" value={subscription ? `$${(subscription.mrr_value * 12).toLocaleString()}/yr` : '$0/yr'} accent />
+                    <InfoRow icon={CreditCard} label={tx('ux.currentPlan')}   value={subscription?.plan_name ?? clinic.tier ?? '—'} />
+                    <InfoRow icon={TrendingUp} label={tx('ux.contractValue')} value={subscription ? `$${(subscription.mrr_value * 12).toLocaleString()}/yr` : '$0/yr'} accent />
                   </div>
                 </motion.section>
 
@@ -954,19 +957,19 @@ export const ClinicDrawer = ({
                 <motion.section variants={itemVariants}>
                   <div className="flex items-center gap-2 mb-3 px-1">
                     <Activity size={14} className="text-wellq-cyan" />
-                    <h3 className="text-xs font-bold text-wellq-dark dark:text-white uppercase tracking-wider">Usage Stats</h3>
+                    <h3 className="text-xs font-bold text-wellq-dark dark:text-white uppercase tracking-wider">{tx('ux.usageStats')}</h3>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <StatCard
                       value={usage?.patient_sessions_completed?.toLocaleString() ?? '0'}
-                      label="Patient Sessions"
+                      label={tx('ux.patientSessions')}
                       colorClass="text-wellq-cyan"
                       borderClass="border-wellq-cyan/20 dark:border-wellq-cyan/20"
                       bgClass="bg-wellq-cyan/5 dark:bg-wellq-cyan/10"
                     />
                     <StatCard
                       value={usage?.active_clinicians?.toLocaleString() ?? '0'}
-                      label="Active Clinicians"
+                      label={tx('ux.activeClinicians')}
                       colorClass="text-wellq-green"
                       borderClass="border-wellq-green/20 dark:border-wellq-green/20"
                       bgClass="bg-wellq-green/5 dark:bg-wellq-green/10"
@@ -1009,15 +1012,15 @@ export const ClinicDrawer = ({
                       <SettingsIcon size={20} className="text-wellq-dark dark:text-white" />
                     </div>
                     <div className="flex-1">
-                      <h3 className="font-bold text-base text-wellq-dark dark:text-white">Clinic Configuration</h3>
-                      <p className="text-xs font-medium text-wellq-gray">Manage core details and status for this tenant.</p>
+                      <h3 className="font-bold text-base text-wellq-dark dark:text-white">{tx('ux.clinicConfiguration')}</h3>
+                      <p className="text-xs font-medium text-wellq-gray">{tx('ux.manageCoreDetailsAndStatusFor')}</p>
                     </div>
                   </div>
                 </motion.div>
 
                 <motion.div variants={itemVariants} className="space-y-5 bg-white dark:bg-wellq-dark p-6 rounded-2xl border border-wellq-gray/15 dark:border-white/5 shadow-sm">
                   <div>
-                    <label className="block text-[11px] font-bold text-wellq-gray uppercase tracking-wider mb-2">Clinic Name</label>
+                    <label className="block text-[11px] font-bold text-wellq-gray uppercase tracking-wider mb-2">{tx('ux.clinicName')}</label>
                     <input
                       type="text"
                       value={clinicName}
@@ -1027,7 +1030,7 @@ export const ClinicDrawer = ({
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold text-wellq-gray uppercase tracking-wider mb-2">Assigned Plan</label>
+                    <label className="block text-[11px] font-bold text-wellq-gray uppercase tracking-wider mb-2">{tx('ux.assignedPlan')}</label>
                     <select
                       value={clinicPlan}
                       onChange={(e) => setClinicPlan(e.target.value)}
@@ -1040,14 +1043,14 @@ export const ClinicDrawer = ({
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold text-wellq-gray uppercase tracking-wider mb-2">Account Status</label>
+                    <label className="block text-[11px] font-bold text-wellq-gray uppercase tracking-wider mb-2">{tx('ux.accountStatus')}</label>
                     <select
                       value={clinicStatus}
                       onChange={(e) => setClinicStatus(e.target.value)}
                       className="w-full px-4 py-3 border border-wellq-gray/20 dark:border-white/10 rounded-xl text-sm font-semibold text-wellq-dark dark:text-white dark:bg-white/[0.02] bg-wellq-gray/5 focus:outline-none focus:ring-2 focus:ring-wellq-cyan/50 focus:border-wellq-cyan transition-all cursor-pointer"
                     >
-                      <option value="active">Active</option>
-                      <option value="suspended">Suspended</option>
+                      <option value="active">{tx('ux.active')}</option>
+                      <option value="suspended">{tx('ux.suspended')}</option>
                       <option value="churned">Churned</option>
                     </select>
                   </div>
@@ -1064,9 +1067,9 @@ export const ClinicDrawer = ({
                     className="w-full mt-4 px-4 py-3.5 bg-gradient-to-r from-wellq-cyan to-wellq-blue text-wellq-dark rounded-xl font-black text-sm hover:opacity-90 active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-md shadow-wellq-cyan/20"
                   >
                     {saving
-                      ? <><Loader2 size={16} className="animate-spin" /> Guardando...</>
+                      ? <><Loader2 size={16} className="animate-spin" /> {tx('ux.saving')}</>
                       : saveOk
-                      ? <><CheckCircle size={16} /> ¡Actualizado!</>
+                      ? <><CheckCircle size={16} /> {tx('ux.updated')}</>
                       : 'Save Changes'
                     }
                   </button>
@@ -1090,8 +1093,8 @@ export const ClinicDrawer = ({
                       <Receipt size={20} className="text-wellq-green" />
                     </div>
                     <div>
-                      <h3 className="font-bold text-base text-wellq-dark dark:text-white">Billing History</h3>
-                      <p className="text-xs font-medium text-wellq-gray">Recent invoices and payment status.</p>
+                      <h3 className="font-bold text-base text-wellq-dark dark:text-white">{tx('ux.billingHistory')}</h3>
+                      <p className="text-xs font-medium text-wellq-gray">{tx('ux.recentInvoicesAndPaymentStatus')}</p>
                     </div>
                   </div>
 
@@ -1099,11 +1102,11 @@ export const ClinicDrawer = ({
                   {!invoicesLoading && invoices.length > 0 && (
                     <button
                       onClick={handleExportExcel}
-                      title="Exportar facturas como Excel con pestañas"
+                      title={tx('ux.exportInvoicesToExcelWithTabs')}
                       className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-wellq-green/30 bg-wellq-green/5 hover:bg-wellq-green/10 text-wellq-green text-xs font-bold transition-all hover:scale-105 active:scale-95 cursor-pointer flex-shrink-0"
                     >
                       <FileDown size={14} strokeWidth={2.5} />
-                      Export Excel
+                      {tx('ux.exportExcel')}
                     </button>
                   )}
                 </motion.div>
@@ -1177,8 +1180,8 @@ export const ClinicDrawer = ({
                     <div className="w-14 h-14 rounded-2xl bg-wellq-gray/5 dark:bg-white/5 flex items-center justify-center">
                       <Receipt size={24} className="text-wellq-gray" />
                     </div>
-                    <p className="text-sm font-bold text-wellq-dark dark:text-white">Sin facturas</p>
-                    <p className="text-xs text-wellq-gray">No hay facturas registradas para esta clínica.</p>
+                    <p className="text-sm font-bold text-wellq-dark dark:text-white">{tx('ux.noInvoices')}</p>
+                    <p className="text-xs text-wellq-gray">{tx('ux.thereAreNoInvoicesForThis')}</p>
                   </div>
                 )}
               </motion.div>
@@ -1202,7 +1205,7 @@ export const ClinicDrawer = ({
                 onClick={() => setContactModalOpen(true)}
                 className="w-full px-4 py-3.5 border-2 border-wellq-cyan/30 hover:border-wellq-cyan bg-wellq-cyan/5 hover:bg-wellq-cyan/10 text-wellq-cyan dark:text-wellq-cyan rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
               >
-                <Mail size={16} strokeWidth={2.5} /> Contactar Clínica
+                <Mail size={16} strokeWidth={2.5} /> {tx('ux.contactClinic')}
               </button>
             </motion.div>
           )}

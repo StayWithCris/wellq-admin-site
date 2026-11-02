@@ -1268,6 +1268,13 @@ export default function App() {
     <div
       className="flex h-screen w-full bg-slate-50 overflow-hidden dark:bg-[#070b12]"
     >
+      {/* Mejora #24 — enlace para saltar directo al contenido con el teclado */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:px-4 focus:py-2 focus:rounded-lg focus:bg-white focus:text-wellq-dark focus:shadow-lg"
+      >
+        {t('ux.skipToContent')}
+      </a>
       <style>{`
         @keyframes shimmer        { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
         @keyframes fadeSlideUp    { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
@@ -1344,7 +1351,7 @@ export default function App() {
           t={t}
           canViewSettings={canViewSettings} // 🔥 SE PASA EL PERMISO
         />
-        <main className="flex-1 overflow-y-auto overflow-x-hidden relative main-scroll">
+        <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto overflow-x-hidden relative main-scroll focus:outline-none">
           <div key={view} className="p-8 anim-view">
             {renderView()}
           </div>

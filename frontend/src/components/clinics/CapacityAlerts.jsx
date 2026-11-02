@@ -1,18 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { AlertTriangle, Mail, ChevronDown } from 'lucide-react';
 import { apiFetch } from '../../api/client';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 // Rec #21 — Alertas de límite de pacientes y oportunidad de upgrade
-const draftLink = (c) => {
-  const subject = `Tu clínica ${c.name} está cerca del límite de pacientes`;
-  const body =
-    `Hola,\n\nTu clínica ${c.name} está usando ${c.patients_used} de ${c.patients_limit} pacientes (${c.usage_pct}%).` +
-    (c.suggested_plan ? `\nPara seguir creciendo sin interrupciones te recomendamos el plan ${c.suggested_plan}.` : '') +
-    `\n\nSi quieres, te ayudamos con el cambio.\n\nEquipo WellQ`;
+const draftLink = (c, t) => {
+  const plan = c.suggested_plan ? t('recs.mailPlan', { plan: c.suggested_plan }) : '';
+  const subject = t('recs.mailSubject', { name: c.name });
+  const body = t('recs.mailBody', { name: c.name, used: c.patients_used, limit: c.patients_limit, pct: c.usage_pct, plan });
   return `mailto:${c.contact_email ?? ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 };
 
 export default function CapacityAlerts() {
+  const { t } = useLanguage();
   const [state, setState] = useState({ loading: true, error: null, data: null });
   const [open, setOpen] = useState(false);
 
@@ -31,10 +31,10 @@ export default function CapacityAlerts() {
         <AlertTriangle size={20} className="text-amber-500 shrink-0" />
         <div className="flex-1">
           <div className="font-black text-wellq-dark dark:text-white">
-            {d.total} {d.total === 1 ? 'clínica' : 'clínicas'} cerca de su límite de pacientes
+            {d.total} {d.total === 1 ? t('recs.capClinic') : t('recs.capClinics')} {t('recs.capNear')}
           </div>
           <div className="text-xs text-wellq-gray">
-            {d.critical} sobre el límite · {d.warning} sobre el {d.threshold}% — oportunidad de upgrade
+            {t('recs.capSummary', { c: d.critical, w: d.warning, t: d.threshold })}
           </div>
         </div>
         <ChevronDown size={18} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
@@ -48,16 +48,16 @@ export default function CapacityAlerts() {
                 <div>
                   <div className="font-bold text-sm text-wellq-dark dark:text-white">{c.name}</div>
                   <div className="text-xs text-wellq-gray">
-                    {c.patients_used}/{c.patients_limit} pacientes ({c.usage_pct}%)
-                    {c.current_plan ? ` · plan actual: ${c.current_plan}` : ''}
-                    {c.suggested_plan ? ` · sugerido: ${c.suggested_plan}` : ' · sin plan superior definido'}
+                    {c.patients_used}/{c.patients_limit} {t('recs.capPatients')} ({c.usage_pct}%)
+                    {c.current_plan ? ` · ${t('recs.capCurrentPlan')}: ${c.current_plan}` : ''}
+                    {c.suggested_plan ? ` · ${t('recs.capSuggested')}: ${c.suggested_plan}` : ` · ${t('recs.capNoPlan')}`}
                   </div>
                 </div>
                 <a
-                  href={draftLink(c)}
+                  href={draftLink(c, t)}
                   className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-wellq-cyan/10 text-wellq-cyan hover:bg-wellq-cyan/20"
                 >
-                  <Mail size={14} /> Proponer upgrade
+                  <Mail size={14} /> {t('recs.capUpgrade')}
                 </a>
               </div>
               <div className="mt-2 h-2 rounded-full bg-wellq-gray/15 overflow-hidden">
@@ -69,7 +69,7 @@ export default function CapacityAlerts() {
             </div>
           ))}
           <p className="text-[11px] text-wellq-gray">
-            "Proponer upgrade" abre un borrador en tu correo; WellQ no envía nada automáticamente.
+            {t('recs.capNote')}
           </p>
         </div>
       )}

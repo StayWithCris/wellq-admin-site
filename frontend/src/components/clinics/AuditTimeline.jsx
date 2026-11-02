@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { History, Loader2 } from 'lucide-react';
 import { apiFetch } from '../../api/client';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 // Rec #15 — Historial de auditoría por clínica (lee action_logs desde Neon)
 const ACTION_LABEL = {
@@ -24,6 +25,7 @@ const when = (iso) => {
 };
 
 export function AuditTimeline({ clinicId }) {
+  const { t: tx } = useLanguage();
   const [state, setState] = useState({ loading: true, error: null, items: [] });
 
   useEffect(() => {
@@ -41,13 +43,13 @@ export function AuditTimeline({ clinicId }) {
     <div className="rounded-2xl border border-wellq-gray/20 dark:border-white/10 p-4">
       <div className="flex items-center gap-2 mb-3">
         <History size={16} className="text-wellq-cyan" />
-        <h4 className="font-bold text-sm text-wellq-dark dark:text-white">Historial de cambios</h4>
+        <h4 className="font-bold text-sm text-wellq-dark dark:text-white">{tx('ux.changeHistory')}</h4>
       </div>
 
       {loading && <div className="flex justify-center py-6"><Loader2 className="animate-spin text-wellq-gray" size={20} /></div>}
-      {error && <p className="text-xs text-red-500">No se pudo cargar el historial.</p>}
+      {error && <p className="text-xs text-red-500">{tx('ux.couldNotLoadTheHistory')}</p>}
       {!loading && !error && items.length === 0 && (
-        <p className="text-xs text-wellq-gray">Aún no hay cambios registrados para esta clínica.</p>
+        <p className="text-xs text-wellq-gray">{tx('ux.noChangesHaveBeenRecordedFor')}</p>
       )}
 
       {items.length > 0 && (
