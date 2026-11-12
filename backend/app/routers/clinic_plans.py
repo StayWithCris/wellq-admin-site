@@ -5,9 +5,24 @@ from fastapi import APIRouter, Path, Body, Query, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc, asc
 from app.db.neon import get_db
-from app.models_db import ClinicPlan, ScheduledChange, ClinicUsageMetric, Clinic, Plan
+from app.models_db import ClinicPlan, ScheduledChange, ClinicUsageMetric, Clinic, Plan, PlanCatalog
 
 router = APIRouter(prefix="/api/clinics", tags=["Asignación Plan–Clínica"])
+
+
+async def _ensure_plan_offered(db: AsyncSession, plan_id: str) -> None:
+    """Mejora #2 — no se asignan planes de un catálogo desactivado."""
+    plan = (await db.execute(select(Plan).where(Plan.plan_id == plan_id))).scalars().first()
+    if not plan or not getattr(plan, "catalog_id", None):
+        return
+    catalog = (await db.execute(
+        select(PlanCatalog).where(PlanCatalog.catalog_id == plan.catalog_id)
+    )).scalars().first()
+    if catalog and not catalog.is_active:
+        raise HTTPException(
+            status_code=409,
+            detail=f"El plan pertenece al catálogo '{catalog.name}', que está desactivado.",
+        )
 
 # ==============================================================================
 # ENDPOINT: #17 - GET /api/clinics/{clinicId}/plan
@@ -71,6 +86,7 @@ async def assign_clinic_plan(
     plan = plan_result.scalars().first()
     if not plan:
         raise HTTPException(status_code=404, detail=f"Plan con ID '{plan_id}' no encontrado")
+    await _ensure_plan_offered(db, plan_id)
 
     # 2. Verificar que la Clínica existe
     clinic_result = await db.execute(select(Clinic).where(Clinic.clinic_id == clinicId))
@@ -208,6 +224,7 @@ async def schedule_clinic_plan(
 
     if not plan_id or not effective_from_str:
         raise HTTPException(status_code=400, detail="Los campos 'planId' y 'effectiveFrom' son obligatorios")
+    await _ensure_plan_offered(db, plan_id)
 
     now = datetime.utcnow()
     effective_from = datetime.fromisoformat(effective_from_str.replace("Z", ""))

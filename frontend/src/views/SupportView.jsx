@@ -9,6 +9,7 @@ import { SupportTicketDrawer } from '../components/support/SupportTicketDrawer';
 import { CreateTicketModal } from '../components/support/CreateTicketModal';
 import { SupportConfigPanel } from '../components/support/SupportConfigPanel';
 import SlaMonitor from '../components/support/SlaMonitor';
+import TicketRoutingPanel from '../components/support/TicketRoutingPanel';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Skeleton } from '../components/ui';
 import useHasPermission from '../hooks/useHasPermission';
@@ -247,6 +248,16 @@ export const SupportView = ({ apiClinics = [], searchQuery = '', onOpenCountChan
       {/* ── Mejora #13 — Temporizador de SLA ──────────────────────────────── */}
       <motion.div variants={itemVariants}>
         <SlaMonitor refreshKey={tickets} onSelectTicket={(id) => setSelected(id)} />
+      </motion.div>
+
+      {/* ── Mejora #12 — Asignación inteligente de tickets ────────────────── */}
+      <motion.div variants={itemVariants}>
+        <TicketRoutingPanel
+          refreshKey={tickets}
+          canManage={canManageTickets}
+          onChanged={() => load(filters)}
+          onRulesChanged={reloadCategories}
+        />
       </motion.div>
 
       {/* ── Table ──────────────────────────────────────────────────────────── */}

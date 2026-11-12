@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { TrendingUp, TrendingDown, ChevronLeft, ChevronRight, AlertTriangle, Activity } from 'lucide-react';
+import { TrendingUp, TrendingDown, ChevronLeft, ChevronRight, AlertTriangle, Activity, Lock } from 'lucide-react';
+import { MRR_CLOSED_EVENT } from '../financials/MrrMonthClose';
 
 const fmt = (val) => {
   if (!val && val !== 0) return '$0';
@@ -39,6 +40,9 @@ export const MRRChart = () => {
       }
     };
     fetchData();
+    // Mejora #1 — al cerrar un mes se vuelve a cargar el historial
+    window.addEventListener(MRR_CLOSED_EVENT, fetchData);
+    return () => window.removeEventListener(MRR_CLOSED_EVENT, fetchData);
   }, []);
 
   const totalPages = Math.ceil(snapshots.length / itemsPerPage);
@@ -136,7 +140,14 @@ export const MRRChart = () => {
             >
               {/* Total MRR Card */}
               <div className="relative bg-wellq-gray/5 dark:bg-white/[0.02] rounded-xl p-5 border border-wellq-gray/10 dark:border-white/5 overflow-hidden group">
-                <p className="text-[10px] font-bold text-wellq-gray uppercase tracking-wider mb-1">Total MRR</p>
+                <p className="text-[10px] font-bold text-wellq-gray uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                  Total MRR
+                  {snap.source === 'closed' && (
+                    <span className="inline-flex items-center gap-1 normal-case tracking-normal text-wellq-cyan" title={t('recs.mcClosedBadgeHint')}>
+                      <Lock size={10} /> {t('recs.mcClosedBadge')}
+                    </span>
+                  )}
+                </p>
                 <p className="text-3xl font-black text-wellq-dark dark:text-white tabular-nums tracking-tight">{fmt(snap.total_mrr)}</p>
                 {prevSnap && (
                   <div className={`flex items-center gap-1 mt-2 text-xs font-bold px-2 py-1 inline-flex rounded-md ${snap.monthly_growth_percentage >= 0 ? 'bg-wellq-green/10 text-wellq-green' : 'bg-red-500/10 text-red-400'}`}>

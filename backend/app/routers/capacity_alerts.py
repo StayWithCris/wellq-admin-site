@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.neon import get_db
-from app.models_db import Clinic, ClinicPlan, Plan
+from app.models_db import Clinic, ClinicPlan, Plan, PlanCatalog
 from .dependencies import get_current_user
 
 router = APIRouter(prefix="/api/capacity", tags=["Alertas de Capacidad"])
@@ -45,7 +45,11 @@ async def capacity_alerts(
         for a in sorted(assigned, key=lambda x: x.effective_from):
             current_plan[a.clinic_id] = a.plan_id  # el más reciente gana
 
-        upgrades = sorted((p for p in plans.values() if p.status == "active"),
+        # Mejora #2 — no sugerir planes de catálogos desactivados
+        inactive_catalogs = {c.catalog_id for c in (await db.execute(select(PlanCatalog))).scalars().all()
+                             if not c.is_active}
+        upgrades = sorted((p for p in plans.values()
+                           if p.status == "active" and getattr(p, "catalog_id", None) not in inactive_catalogs),
                           key=lambda p: p.monthly_price)
 
         items = []

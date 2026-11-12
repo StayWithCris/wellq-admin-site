@@ -10,6 +10,7 @@ import { ChurnHeatmap } from '../components/charts/ChurnHeatmap';
 import { ChurnRegionModal } from '../components/charts/ChurnRegionModal';
 import { Skeleton } from '../components/ui';
 import RevenueSimulator from '../components/financials/RevenueSimulator';
+import MrrMonthClose from '../components/financials/MrrMonthClose';
 import { useLanguage } from '../contexts/LanguageContext';
 import { filterAndSortBySearch, hasSearchQuery, matchesSearch } from '../utils/search';
 
@@ -250,6 +251,13 @@ export const FinancialsView = ({ mrrData, churnRegions, loading = false, searchQ
               );
             })}
           </div>
+        </motion.div>
+      )}
+
+      {/* Mejora #1 — Cierre mensual e historial de MRR */}
+      {!searchActive && (
+        <motion.div variants={itemVariants}>
+          <MrrMonthClose />
         </motion.div>
       )}
 

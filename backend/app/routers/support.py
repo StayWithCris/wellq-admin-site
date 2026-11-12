@@ -251,6 +251,7 @@ async def list_ticket_categories(db: AsyncSession = Depends(get_db)):
                     "team":        c.team,
                     "emails":      c.emails,
                     "is_active":   c.is_active,
+                    "auto_assign": bool(getattr(c, "auto_assign", False)),  # Mejora #12
                 }
                 for c in cat_rows
             ],
@@ -797,6 +798,13 @@ async def create_support_ticket(
         if not responder:
             raise HTTPException(status_code=422, detail="Responder no encontrado")
 
+    # ── Mejora #12 — auto-asignación por categoría si no se eligió responder ──
+    auto_assigned = False
+    if responder is None:
+        from .ticket_routing import auto_assign_responder  # import local: evita ciclos
+        responder = await auto_assign_responder(db, body.category)
+        auto_assigned = responder is not None
+
     now = datetime.utcnow()
     new_ticket = SupportTicket(
         ticket_id      = f"TK-{uuid.uuid4().hex[:8].upper()}",
@@ -847,6 +855,7 @@ async def create_support_ticket(
         "responder_name": new_ticket.responder_name,
         "responder_team": responder.team if responder else None,
         "reported_at":    new_ticket.reported_at.isoformat(),
+        "auto_assigned":  auto_assigned,
     }
 
 

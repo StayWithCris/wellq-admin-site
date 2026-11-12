@@ -16,6 +16,9 @@ from app.routers import audit_center
 from app.routers import revenue_simulator
 from app.routers import capacity_alerts
 from app.routers import sla
+from app.routers import mrr_close
+from app.routers import plan_catalogs
+from app.routers import ticket_routing
 import structlog
 import logging
 import app.models_db  # registra todos los modelos SQLModel
@@ -143,6 +146,9 @@ app.include_router(audit_center.router)  # Mejora #16 — /api/audit/logs
 app.include_router(revenue_simulator.router)  # Mejora #3 — /api/simulator/revenue
 app.include_router(capacity_alerts.router)  # Mejora #21 — /api/capacity/alerts
 app.include_router(sla.router)  # Mejora #13 — /api/sla/tickets
+app.include_router(mrr_close.router)  # Mejora #1 — /api/financials/mrr/close*
+app.include_router(plan_catalogs.router)  # Mejora #2 — /api/plan-catalogs
+app.include_router(ticket_routing.router)  # Mejora #12 — /api/ticket-routing
 
 
 # Registro de los nuevos componentes adaptados

@@ -90,5 +90,8 @@ class TicketCategory(SQLModel, table=True):
     team: Optional[str]       = Field(default=None, index=True)  # → join con Responder.team
     emails: Optional[str]     = Field(default=None, sa_column=Column(Text))  # JSON: '["a@b.co"]'
     is_active: bool           = Field(default=True)              # False → oculto en formularios
+    # ── Mejora #12 — True: los tickets nuevos sin responsable se asignan solos
+    #    al responder del equipo con menos tickets abiertos.
+    auto_assign: bool         = Field(default=False)
     created_at: datetime      = Field(default_factory=datetime.utcnow)
     updated_at: datetime      = Field(default_factory=datetime.utcnow)

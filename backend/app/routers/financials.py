@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import json
 from app.db.neon import get_db
 from app.models_db import Clinic, ClinicPlan, MrrSnapshot
+from app.services.mrr_close import merge_closed
 
 router = APIRouter(prefix="/api/financials", tags=["Financials"])
 
@@ -303,8 +304,19 @@ async def get_mrr_snapshots(
     result = await db.execute(clinic_stmt)
     clinics = result.scalars().all()
 
+    # Mejora #1 — meses cerrados oficialmente (source no nulo) reemplazan al cálculo en vivo
+    closed_rows = (await db.execute(
+        select(MrrSnapshot).where(MrrSnapshot.clinic_id.is_(None), MrrSnapshot.source.is_not(None))
+    )).scalars().all()
+    closed = [{
+        "period_month": s.period_month, "period_year": s.period_year,
+        "total_mrr": s.total_mrr, "new_business": s.new_business, "expansion": s.expansion,
+        "contraction": s.contraction, "churn": s.churn, "retained": s.retained,
+        "monthly_growth_percentage": s.monthly_growth_percentage,
+    } for s in closed_rows]
+
     if not clinics:
-        return {"status": "success", "data": []}
+        return {"status": "success", "data": merge_closed([], closed)}
 
     first_clinic = clinics[0]
     start_year = first_clinic.created_at.year
@@ -358,7 +370,7 @@ async def get_mrr_snapshots(
 
     return {
         "status": "success",
-        "data": data
+        "data": merge_closed(data, closed)
     }
 
 CANONICAL_CHURN_REGIONS = ["North America", "LATAM", "Europe", "Asia Pacific"]
