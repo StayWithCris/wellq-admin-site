@@ -64,6 +64,16 @@ async def create_db_tables() -> None:
         await conn.run_sync(SQLModel.metadata.create_all)
         await conn.execute(text("ALTER TABLE support_tickets ADD COLUMN IF NOT EXISTS responder_id varchar DEFAULT NULL"))
         await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_support_tickets_responder_id ON support_tickets (responder_id)"))
+        # Mejora #1 — columnas del cierre mensual de MRR
+        await conn.execute(text("ALTER TABLE mrr_snapshots ADD COLUMN IF NOT EXISTS source varchar DEFAULT NULL"))
+        await conn.execute(text("ALTER TABLE mrr_snapshots ADD COLUMN IF NOT EXISTS closed_by_email varchar DEFAULT NULL"))
+        await conn.execute(text("ALTER TABLE mrr_snapshots ADD COLUMN IF NOT EXISTS notes text DEFAULT NULL"))
+        await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_mrr_snapshots_source ON mrr_snapshots (source)"))
+        # Mejora #2 — catálogo de cada plan
+        await conn.execute(text("ALTER TABLE plans ADD COLUMN IF NOT EXISTS catalog_id varchar DEFAULT NULL"))
+        await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_plans_catalog_id ON plans (catalog_id)"))
+        # Mejora #12 — asignación automática por categoría
+        await conn.execute(text("ALTER TABLE ticket_categories ADD COLUMN IF NOT EXISTS auto_assign boolean NOT NULL DEFAULT false"))
         await conn.execute(text("""
             DO $$
             BEGIN

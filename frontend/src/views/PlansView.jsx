@@ -7,7 +7,7 @@ import {
   DollarSign, Package, Plus, Trash2, GripVertical, Edit3, Copy,
   Archive, Save, Tag, Box, Layers, Search, X, CheckCircle,
   AlertCircle, Loader2, RefreshCw, ChevronDown, CheckCircle2,
-  AlertTriangle, RotateCcw,
+  AlertTriangle, RotateCcw, FolderOpen, EyeOff,
 } from 'lucide-react';
 import { SegmentedControl } from '../components/ui';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -16,6 +16,9 @@ import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { apiFetch } from '../api/client';
 import useHasPermission from '../hooks/useHasPermission';
 import { filterAndSortBySearch, hasSearchQuery } from '../utils/search';
+import {
+  usePlanCatalogs, PlanCatalogFilter, PlanCatalogsManager, filterPlansByCatalog, CATALOG_COLORS,
+} from '../components/plans/PlanCatalogs';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -967,10 +970,11 @@ const PlanBuilder = ({ plan, features, onSave, onCancel, saving, searchQuery = '
 
 
 // ─── PlansLibrary ─────────────────────────────────────────────────────────────
-const PlansLibrary = ({ plans, features, onEdit, onDuplicate, onArchive, onDelete, onNew, loading, error, onReload, canManagePlans, searchQuery = '' }) => {
+const PlansLibrary = ({ plans, features, onEdit, onDuplicate, onArchive, onDelete, onNew, loading, error, onReload, canManagePlans, searchQuery = '', catalogs = [] }) => {
   const { t, tVal } = useLanguage();
+  const [catalogFilter, setCatalogFilter] = useState('all');   // Mejora #2
   const featuresById = Object.fromEntries(features.map((f) => [f.id, f]));
-  const filteredPlans = filterAndSortBySearch(plans, searchQuery, (plan) => getPlanSearchValues(plan, featuresById, tVal));
+  const filteredPlans = filterAndSortBySearch(filterPlansByCatalog(plans, catalogFilter), searchQuery, (plan) => getPlanSearchValues(plan, featuresById, tVal));
   const searchActive = hasSearchQuery(searchQuery);
 
   if (loading) return <motion.div variants={tabVariants} initial="hidden" animate="enter" exit="exit"><LoadingSpinner text={t('plans.loadingPlans')} /></motion.div>;
@@ -990,6 +994,9 @@ const PlansLibrary = ({ plans, features, onEdit, onDuplicate, onArchive, onDelet
         )}
       </div>
 
+      {/* Mejora #2 — filtro por catálogo */}
+      <PlanCatalogFilter catalogs={catalogs} plans={plans} value={catalogFilter} onChange={setCatalogFilter} />
+
       {plans.length === 0 && (
         <div className="py-24 text-center text-wellq-gray text-sm font-medium">{t('plans.noPlans')}</div>
       )}
@@ -1006,7 +1013,15 @@ const PlansLibrary = ({ plans, features, onEdit, onDuplicate, onArchive, onDelet
           return (
             <motion.div variants={itemVariants} key={plan.id} className="bg-white dark:bg-wellq-dark rounded-[24px] p-6 shadow-sm border border-wellq-gray/20 dark:border-white/10 hover:shadow-lg dark:hover:border-white/20 transition-all duration-300 flex flex-col group relative overflow-hidden">
               <div className="flex items-start justify-between mb-4 relative z-10">
-                <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${tagColor}`}>{plan.name}</span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${tagColor}`}>{plan.name}</span>
+                  {plan.catalogName && (
+                    <span title={plan.catalogActive ? '' : t('recs.pcInactiveHint')}
+                      className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold border ${CATALOG_COLORS[catalogs.find((c) => c.id === plan.catalogId)?.color] || CATALOG_COLORS.slate}`}>
+                      {plan.catalogActive ? <FolderOpen size={10} /> : <EyeOff size={10} />} {plan.catalogName}
+                    </span>
+                  )}
+                </div>
                 <span className="text-[10px] font-bold uppercase tracking-wider text-wellq-gray flex items-center gap-1.5 bg-wellq-gray/10 dark:bg-white/5 px-2.5 py-1 rounded-md">
                   <span className="w-1.5 h-1.5 rounded-full bg-wellq-green" /> {tVal(plan.status)}
                 </span>
@@ -1239,6 +1254,7 @@ export const PlansView = ({ searchQuery = '' }) => {
 
   const { features, loading: featLoading, error: featError, reload: reloadFeatures, setFeatures } = useFeatures();
   const { plans, loading: plansLoading, error: plansError, reload: reloadPlans } = usePlans();
+  const { catalogs, reload: reloadCatalogs } = usePlanCatalogs();   // Mejora #2
 
   // ── Planes archivados (NUEVO) ─────────────────────────────────────────────
   const {
@@ -1416,6 +1432,7 @@ export const PlansView = ({ searchQuery = '' }) => {
           { id: 'library',    label: t('plans.library'),  icon: Layers },
           { id: 'builder',    label: t('plans.builder'),  icon: Box    },
           { id: 'catalog',    label: t('plans.catalog'),  icon: Tag    },
+          { id: 'planCatalogs', label: t('recs.pcTab'),   icon: FolderOpen },
           { id: 'archivados', label: t('plans.archived'), icon: Archive },
         ].filter(({ id }) => canManagePlans || id === 'library').map(({ id, label, icon: Icon }) => (
           <button
@@ -1459,7 +1476,17 @@ export const PlansView = ({ searchQuery = '' }) => {
             onReload={() => { reloadPlans(); reloadFeatures(); }}
             canManagePlans={canManagePlans}
             searchQuery={searchQuery}
+            catalogs={catalogs}
           />
+        )}
+        {canManagePlans && tab === 'planCatalogs' && (
+          <motion.div key="planCatalogs" variants={tabVariants} initial="hidden" animate="enter" exit="exit">
+            <PlanCatalogsManager
+              catalogs={catalogs}
+              plans={plans}
+              onChanged={() => { reloadCatalogs(); reloadPlans(); }}
+            />
+          </motion.div>
         )}
         {canManagePlans && tab === 'builder' && editingPlan && (
           <PlanBuilder

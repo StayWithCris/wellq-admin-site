@@ -4,7 +4,7 @@ from fastapi import APIRouter, Path, Body, Query, status, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc, asc, or_, delete
 from app.db.neon import get_db
-from app.models_db import Plan, PlanFeature, ClinicPlan
+from app.models_db import Plan, PlanCatalog, PlanFeature, ClinicPlan
 from .dependencies import require_super_admin
 
 router = APIRouter(prefix="/api/plans", tags=["Constructor de Planes"])
@@ -63,6 +63,13 @@ async def _serialize_plan(db: AsyncSession, p: Plan) -> dict:
     arr_at_risk = active_clinics * monthly_price * 12
     features = await _get_plan_features(db, p.plan_id)
 
+    # Mejora #2 — catálogo del plan (None = sin catálogo)
+    catalog = None
+    if getattr(p, "catalog_id", None):
+        catalog = (await db.execute(
+            select(PlanCatalog).where(PlanCatalog.catalog_id == p.catalog_id)
+        )).scalars().first()
+
     eff_date_str = None
     if p.effective_date:
         if isinstance(p.effective_date, str):
@@ -81,6 +88,9 @@ async def _serialize_plan(db: AsyncSession, p: Plan) -> dict:
         "currency": p.currency or "USD",
         "effectiveDate": eff_date_str,
         "features": features,
+        "catalogId": catalog.catalog_id if catalog else None,
+        "catalogName": catalog.name if catalog else None,
+        "catalogActive": bool(catalog.is_active) if catalog else True,
         "metrics": {
             "activeClinics": active_clinics,
             "historicalClinics": historical_clinics,   # NUEVO
@@ -109,6 +119,8 @@ async def list_plans(
     pageSize: int = Query(20, ge=1, le=100),
     sortBy: str = Query("name"),
     sortOrder: str = Query("asc"),
+    catalogId: str | None = Query(None, description="ID de catálogo, o 'none' para planes sin catálogo (Mejora #2)"),
+    availableOnly: bool = Query(False, description="Excluir planes de catálogos desactivados (Mejora #2)"),
     db: AsyncSession = Depends(get_db)
 ):
     stmt = select(Plan)
@@ -128,6 +140,14 @@ async def list_plans(
             func.lower(Plan.name).like(term),
             func.lower(Plan.description).like(term)
         ))
+
+    if catalogId == "none":
+        filters.append(Plan.catalog_id.is_(None))
+    elif catalogId:
+        filters.append(Plan.catalog_id == catalogId)
+    if availableOnly:
+        active_catalogs = select(PlanCatalog.catalog_id).where(PlanCatalog.is_active == True)  # noqa: E712
+        filters.append(or_(Plan.catalog_id.is_(None), Plan.catalog_id.in_(active_catalogs)))
 
     if filters:
         stmt = stmt.where(*filters)

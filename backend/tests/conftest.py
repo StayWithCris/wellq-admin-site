@@ -44,6 +44,8 @@ class FakeSession:
 
     def __init__(self, data=None):
         self.data = data or {}
+        self.added = []      # objetos pasados a add() (Mejoras #1, #2 y #12)
+        self.deleted = []
 
     async def execute(self, stmt, *args, **kwargs):
         try:
@@ -51,6 +53,15 @@ class FakeSession:
         except Exception:
             entity = None
         return _Result(self.data.get(entity, []))
+
+    def add(self, obj):
+        self.added.append(obj)
+
+    async def delete(self, obj):
+        self.deleted.append(obj)
+
+    async def refresh(self, obj):
+        pass
 
     async def commit(self):
         pass

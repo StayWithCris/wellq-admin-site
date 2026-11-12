@@ -86,6 +86,13 @@ class MrrSnapshot(SQLModel, table=True):
     retained: float                    = Field(default=0.0)
     monthly_growth_percentage: float   = Field(default=0.0)
     created_at: datetime               = Field(default_factory=datetime.utcnow)
+    # ── Mejora #1 — Cierre mensual de MRR ─────────────────────────────────────
+    # source = NULL  → fila histórica/demostración (no se usa como cierre oficial)
+    # source = "auto"   → mes cerrado con el cálculo desde la tabla clinics
+    # source = "manual" → mes cerrado con valores ingresados por el administrador
+    source: Optional[str]              = Field(default=None, index=True)
+    closed_by_email: Optional[str]     = Field(default=None)
+    notes: Optional[str]               = Field(default=None, sa_column=Column(Text))
 
 
 class AppUsageStat(SQLModel, table=True):

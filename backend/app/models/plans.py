@@ -46,6 +46,25 @@ class Plan(SQLModel, table=True):
     created_at: datetime            = Field(default_factory=datetime.utcnow)
     updated_at: datetime            = Field(default_factory=datetime.utcnow)
     archived_at: Optional[datetime] = Field(default=None)
+    # ── Mejora #2 — Catálogo al que pertenece el plan (NULL = sin catálogo) ────
+    catalog_id: Optional[str]       = Field(default=None, index=True)
+
+class PlanCatalog(SQLModel, table=True):
+    """
+    Mejora #2 — Agrupa planes en catálogos (ej.: Internacional, Pilotos, Promociones).
+    Si is_active = False, los planes del catálogo dejan de ofrecerse: no aparecen
+    con availableOnly=true y no se pueden asignar a clínicas. No se borra nada.
+    """
+    __tablename__ = "plan_catalogs"
+
+    id: Optional[int]           = Field(default=None, primary_key=True)
+    catalog_id: str             = Field(unique=True, index=True)   # "cat-plan-xxxx"
+    name: str                   = Field(unique=True)
+    description: Optional[str]  = Field(default=None, sa_column=Column(Text))
+    color: str                  = Field(default="slate")
+    is_active: bool             = Field(default=True, index=True)
+    created_at: datetime        = Field(default_factory=datetime.utcnow)
+    updated_at: datetime        = Field(default_factory=datetime.utcnow)
 
 class PlanFeature(SQLModel, table=True):
     __tablename__ = "plan_features"

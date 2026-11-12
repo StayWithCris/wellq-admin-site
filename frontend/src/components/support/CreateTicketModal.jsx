@@ -1,9 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, TicketPlus, Loader2, ChevronDown, AlertCircle, Info } from 'lucide-react';
+import { X, TicketPlus, Loader2, ChevronDown, AlertCircle, Info, Shuffle } from 'lucide-react';
+import { toast } from 'sonner';
 
 import {
+  apiFetch,
   createSupportTicket,
   fetchSupportResponders,
 } from '../../api/client';
@@ -50,6 +52,18 @@ export const CreateTicketModal = ({ clinics = [], categories = [], onClose, onCr
     loadMeta();
     return () => { cancelled = true; };
   }, []);
+
+  // ── Mejora #12 — sugerencia de responsable según la categoría ────────────
+  const [suggestion, setSuggestion] = useState(null);
+  useEffect(() => {
+    if (!form.category) { setSuggestion(null); return undefined; }
+    let alive = true;
+    apiFetch(`/api/ticket-routing/suggest?category=${encodeURIComponent(form.category)}`)
+      .then((res) => alive && setSuggestion(res?.data ?? null))
+      .catch(() => alive && setSuggestion(null));
+    return () => { alive = false; };
+  }, [form.category]);
+  const categoryAutoAssign = categories.find((c) => c.name === form.category)?.auto_assign ?? false;
 
   // ── Agrupación y ordenamiento dinámico optimizado con useMemo ────────────
   const selectedCategoryTeam = useMemo(() => {
@@ -99,7 +113,7 @@ export const CreateTicketModal = ({ clinics = [], categories = [], onClose, onCr
     setSaving(true);
     setError(null);
     try {
-      await createSupportTicket({
+      const created = await createSupportTicket({
         title:          form.title.trim(),
         description:    form.description.trim(),
         category:       form.category,
@@ -108,6 +122,9 @@ export const CreateTicketModal = ({ clinics = [], categories = [], onClose, onCr
         reporter_email: form.reporter_email.trim() || undefined,
         responder_id:   form.responder_id   || undefined,
       });
+      if (created?.auto_assigned) {
+        toast.success(t('recs.trAutoAssignedToast', { name: created.responder_name }));
+      }
       onCreated?.();
     } catch (err) {
       setError(err.message ?? t('support.errorCreateTicket'));
@@ -286,6 +303,25 @@ export const CreateTicketModal = ({ clinics = [], categories = [], onClose, onCr
                     </motion.p>
                   )}
                 </AnimatePresence>
+
+                {/* Mejora #12 — responsable sugerido (menor carga del equipo) */}
+                {suggestion?.status === 'ok' && !form.responder_id && (
+                  <div className="flex flex-wrap items-center gap-2 mt-2 text-[11px] font-medium text-wellq-gray">
+                    <Shuffle size={11} strokeWidth={2.5} className="text-wellq-cyan flex-shrink-0" />
+                    <span>
+                      {t('recs.trSuggested', { name: suggestion.responder.name, n: suggestion.responder.open_tickets })}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => set('responder_id', suggestion.responder.id)}
+                      disabled={saving}
+                      className="px-2 py-0.5 rounded-md font-bold text-wellq-cyan border border-wellq-cyan/30 hover:bg-wellq-cyan/10"
+                    >
+                      {t('recs.trUseSuggestion')}
+                    </button>
+                    {categoryAutoAssign && <span className="basis-full">{t('recs.trAutoHint')}</span>}
+                  </div>
+                )}
               </div>
             </Field>
 
