@@ -28,7 +28,7 @@ npm --version
 ## 2. Descargar proyecto
 
 ```bash
-git clone https://github.com/Carlitos2004/WellQ-admin-1.2.git
+git clone https://github.com/StayWithCris/wellq-admin-site.git
 cd WellQ-admin-1.2
 ```
 
