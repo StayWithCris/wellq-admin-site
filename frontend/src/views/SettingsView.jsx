@@ -11,6 +11,7 @@ import { Skeleton } from '../components/ui';
 import { apiFetch, fetchSyncStatus } from '../api/client';
 import { toast } from 'sonner';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
+import SecurityPanel from '../components/settings/SecurityPanel';
 import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import LanguageSelector from './LanguageSelector';
@@ -556,6 +557,15 @@ export const SettingsView = ({
     }
     if (currentTab === 'team' && !canViewTeam) {
       currentTab = 'general';
+    }
+
+    // Rec #18 — Seguridad de la cuenta (doble factor y sesiones): disponible para todos los usuarios
+    if (currentTab === 'security') {
+      return (
+        <motion.div key="security" variants={tabVariants} initial="hidden" animate="enter" exit="exit">
+          <SecurityPanel />
+        </motion.div>
+      );
     }
 
     if (currentTab === 'api_keys') {
@@ -1342,6 +1352,7 @@ export const SettingsView = ({
     { id: 'general', label: t('settings.general') },
     ...(canViewApiKeys ? [{ id: 'api_keys', label: t('settings.apiKeys') }] : []),
     ...(canViewTeam ? [{ id: 'team', label: t('settings.team') }] : []),
+    { id: 'security', label: t('recs.secTab') },
   ];
 
   const currentActiveTab = activeTab === 'api_keys' && !canViewApiKeys

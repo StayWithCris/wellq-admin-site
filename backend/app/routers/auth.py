@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timedelta
 
 import bcrypt as _bcrypt
-from fastapi import APIRouter, Body, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,7 +10,8 @@ from sqlalchemy import select
 
 from app.config import settings
 from app.db.neon import get_db
-from app.models_db import AdminUser, Permission, RolePermission, Role   # ← Role añadido
+from app.models_db import AdminUser, AdminSession, Permission, RolePermission, Role   # ← Role añadido
+from app.services.admin_sessions import describe_agent, session_active   # Mejora #18
 
 # ── Configuración ──────────────────────────────────────────────────────────────
 # JWT_SECRET se lee desde backend/.env. No usar valores de ejemplo en ambientes reales.
@@ -18,6 +19,7 @@ JWT_SECRET      = settings.jwt_secret
 JWT_ALGORITHM   = settings.jwt_algorithm
 ACCESS_EXPIRES  = timedelta(hours=1)
 REFRESH_EXPIRES = timedelta(days=7)
+TWO_FACTOR_CHALLENGE_EXPIRES = timedelta(minutes=5)   # Mejora #18: tiempo para ingresar el código
 
 router = APIRouter(prefix="/api/auth", tags=["Autenticación y Seguridad"])
 
@@ -193,6 +195,65 @@ async def register(body: dict = Body(...), db: AsyncSession = Depends(get_db)):
     }
 
 
+# ── Mejora #18: emisión de tokens con sesión registrada ───────────────────────
+def client_ip(request: Request) -> str | None:
+    """IP del cliente (Cloud Run entrega la original en X-Forwarded-For)."""
+    forwarded = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+    return forwarded or (request.client.host if request.client else None)
+
+
+async def issue_session(db: AsyncSession, user: AdminUser, request: Request, two_factor: bool) -> dict:
+    """
+    Registra la sesión y devuelve la respuesta de login (tokens + usuario).
+    Lo usan POST /login (sin 2FA) y POST /2fa/verify (con 2FA). Los tokens llevan "sid".
+    """
+    now = datetime.utcnow()
+    user.last_login = now
+    db.add(user)
+    session = AdminSession(
+        session_id=f"ses_{uuid.uuid4().hex[:16]}",
+        user_id=user.user_id,
+        email=user.email,
+        created_at=now,
+        last_seen_at=now,
+        expires_at=now + REFRESH_EXPIRES,
+        ip=client_ip(request),
+        user_agent=(request.headers.get("user-agent") or "")[:300] or None,
+        two_factor=two_factor,
+    )
+    db.add(session)
+    await db.commit()
+    # RBAC: refresh necesario para que user.role_id no esté expirado post-commit
+    await db.refresh(user)
+
+    permissions   = await _load_user_permissions(user, db)
+    role_name     = await _load_role_name(user, db)
+    payload       = {**user_payload(user, permissions), "sid": session.session_id}
+    access_token  = create_token({**payload, "type": "access"},  ACCESS_EXPIRES)
+    refresh_token = create_token({**payload, "type": "refresh"}, REFRESH_EXPIRES)
+
+    return {
+        "status":  "success",
+        "message": "Autenticación exitosa",
+        "data": {
+            "access_token":  access_token,
+            "refresh_token": refresh_token,
+            "token_type":    "Bearer",
+            "expires_in":    int(ACCESS_EXPIRES.total_seconds()),
+            "user": {
+                "user_id":     user.user_id,
+                "email":       user.email,
+                "full_name":   user.full_name,
+                "role":        user.role,           # legacy string (backward compat)
+                "role_name":   role_name,            # nombre real del rol RBAC para el sidebar
+                "role_id":     user.role_id,         # ID para comparaciones en el frontend
+                "permissions": permissions,
+                "two_factor_enabled": bool(user.totp_enabled),
+            }
+        }
+    }
+
+
 # ==============================================================================
 # ENDPOINT: #12 - POST /api/auth/login
 # Descripción: Valida usuario y contraseña; entrega token JWT real
@@ -202,7 +263,7 @@ async def register(body: dict = Body(...), db: AsyncSession = Depends(get_db)):
     summary="Valida usuario y contraseña; entrega token JWT real",
     status_code=status.HTTP_200_OK,
 )
-async def login(body: dict = Body(...), db: AsyncSession = Depends(get_db)):
+async def login(request: Request, body: dict = Body(...), db: AsyncSession = Depends(get_db)):
     email    = body.get("email", "").strip().lower()
     password = body.get("password", "")
 
@@ -221,39 +282,23 @@ async def login(body: dict = Body(...), db: AsyncSession = Depends(get_db)):
     if user.status != "active":
         raise HTTPException(status_code=403, detail="Usuario inactivo")
 
-    # Actualizar last_login
-    user.last_login = datetime.utcnow()
-    db.add(user)
-    await db.commit()
-    # RBAC: refresh necesario para que user.role_id no esté expirado post-commit
-    await db.refresh(user)
-
-    # Cargar permissions y nombre del rol RBAC
-    permissions   = await _load_user_permissions(user, db)
-    role_name     = await _load_role_name(user, db)          # ← NUEVO
-    payload       = user_payload(user, permissions)
-    access_token  = create_token({**payload, "type": "access"},  ACCESS_EXPIRES)
-    refresh_token = create_token({**payload, "type": "refresh"}, REFRESH_EXPIRES)
-
-    return {
-        "status":  "success",
-        "message": "Autenticación exitosa",
-        "data": {
-            "access_token":  access_token,
-            "refresh_token": refresh_token,
-            "token_type":    "Bearer",
-            "expires_in":    int(ACCESS_EXPIRES.total_seconds()),
-            "user": {
-                "user_id":     user.user_id,
-                "email":       user.email,
-                "full_name":   user.full_name,
-                "role":        user.role,           # legacy string (backward compat)
-                "role_name":   role_name,            # ← NUEVO: nombre real del rol RBAC para el sidebar
-                "role_id":     user.role_id,         # ← NUEVO: ID para comparaciones en el frontend
-                "permissions": permissions,
-            }
+    # Mejora #18: con doble factor activo no se entregan tokens todavía; se pide el código
+    if user.totp_enabled:
+        challenge = create_token(
+            {"user_id": user.user_id, "email": user.email, "type": "2fa"},
+            TWO_FACTOR_CHALLENGE_EXPIRES,
+        )
+        return {
+            "status":  "2fa_required",
+            "message": "Ingresa el código de tu aplicación de autenticación",
+            "data": {
+                "two_factor_required": True,
+                "challenge_token": challenge,
+                "expires_in": int(TWO_FACTOR_CHALLENGE_EXPIRES.total_seconds()),
+            },
         }
-    }
+
+    return await issue_session(db, user, request, two_factor=False)
 
 
 # ==============================================================================
@@ -265,9 +310,21 @@ async def login(body: dict = Body(...), db: AsyncSession = Depends(get_db)):
     summary="Registrar cierre de sesión",
     status_code=status.HTTP_200_OK,
 )
-async def logout():
+async def logout(body: dict = Body(default={}), db: AsyncSession = Depends(get_db)):
     # JWT es stateless: el frontend elimina el token del lado cliente.
-    # Si en el futuro usas una blocklist (Redis), agrégala aquí.
+    # Mejora #18: si llega el refresh token, además se revoca su sesión registrada,
+    # así ese refresh token ya no sirve para renovar el acceso.
+    try:
+        payload = decode_token((body or {}).get("refresh_token", ""))
+        sid = payload.get("sid")
+        if sid:
+            sess = (await db.execute(select(AdminSession).where(AdminSession.session_id == sid))).scalars().first()
+            if sess and not sess.revoked_at:
+                sess.revoked_at = datetime.utcnow()
+                db.add(sess)
+                await db.commit()
+    except HTTPException:
+        pass   # token ausente o vencido: no hay sesión que cerrar
     return {
         "status":  "success",
         "message": "Sesión cerrada correctamente en el servidor.",
@@ -294,6 +351,14 @@ async def refresh_token(body: dict = Body(...), db: AsyncSession = Depends(get_d
     if payload.get("type") != "refresh":
         raise HTTPException(status_code=401, detail="Token inválido")
 
+    # Mejora #18: si el token pertenece a una sesión registrada, debe seguir vigente
+    sid = payload.get("sid")
+    sess = None
+    if sid:
+        sess = (await db.execute(select(AdminSession).where(AdminSession.session_id == sid))).scalars().first()
+        if not sess or not session_active(sess.expires_at, sess.revoked_at, datetime.utcnow()):
+            raise HTTPException(status_code=401, detail="La sesión fue cerrada. Inicia sesión nuevamente.")
+
     # Verificar que el usuario sigue activo en BD
     result = await db.execute(select(AdminUser).where(AdminUser.email == payload["email"]))
     user: AdminUser | None = result.scalars().first()
@@ -303,7 +368,12 @@ async def refresh_token(body: dict = Body(...), db: AsyncSession = Depends(get_d
 
     # RBAC: recargar permissions actuales — pueden haber cambiado desde el último login
     permissions = await _load_user_permissions(user, db)
-    new_access  = create_token({**user_payload(user, permissions), "type": "access"}, ACCESS_EXPIRES)
+    new_payload = {**user_payload(user, permissions), **({"sid": sid} if sid else {})}
+    new_access  = create_token({**new_payload, "type": "access"}, ACCESS_EXPIRES)
+    if sess:
+        sess.last_seen_at = datetime.utcnow()
+        db.add(sess)
+        await db.commit()
 
     return {
         "status":  "success",
@@ -353,6 +423,7 @@ async def get_me(
         "status":      user.status,
         "last_login":  user.last_login.isoformat() if user.last_login else None,
         "permissions": permissions,
+        "two_factor_enabled": bool(user.totp_enabled),
     }
 
 

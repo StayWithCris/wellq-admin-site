@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
-import { History, Download, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { History, Download, Loader2, ChevronLeft, ChevronRight, ShieldAlert } from 'lucide-react';
 import { apiFetch } from '../api/client';
 import { useLanguage } from '../contexts/LanguageContext';
+import ImpersonationConsole from '../components/audit/ImpersonationConsole';
 
 // Rec #16 — Centro de auditoría global (lee action_logs desde Neon)
 const PAGE_SIZE = 25;
 const ACTIONS = ['', 'CREATE', 'UPDATE', 'SOFT_DELETE', 'HARD_DELETE'];
-const ENTITIES = ['', 'clinic', 'plan', 'feature'];
+const ENTITIES = ['', 'clinic', 'plan', 'feature', 'discount', 'clinic_discount', 'admin_user', 'impersonation_session'];
 
 const fmt = (v) => (v === null || v === undefined || v === '' ? '—' : typeof v === 'object' ? JSON.stringify(v) : String(v));
 const when = (iso) => {
@@ -27,7 +28,7 @@ const buildQuery = (f, page, pageSize) => {
 
 const inputCls = 'w-full rounded-lg border border-wellq-gray/20 dark:border-white/10 bg-transparent px-2.5 py-2 text-xs text-wellq-dark dark:text-white';
 
-export function AuditCenterView() {
+function AuditLogPanel() {
   const { t: tx } = useLanguage();
   const [filters, setFilters] = useState({ action: '', entity_type: '', admin_email: '', q: '', date_from: '', date_to: '' });
   const [applied, setApplied] = useState(filters);
@@ -151,3 +152,30 @@ export function AuditCenterView() {
 }
 
 export default AuditCenterView;
+
+// Rec #14 — el Audit Log tiene dos pestañas: registro de acciones y sesiones de soporte
+export function AuditCenterView() {
+  const { t } = useLanguage();
+  const [tab, setTab] = useState('log');
+  const tabs = [
+    { id: 'log', label: t('recs.auditTabLog'), icon: History },
+    { id: 'impersonation', label: t('recs.auditTabSessions'), icon: ShieldAlert },
+  ];
+  return (
+    <div className="space-y-4">
+      <div role="tablist" className="flex items-center gap-1.5 p-1.5 bg-wellq-gray/5 dark:bg-white/[0.03] border border-wellq-gray/10 dark:border-white/5 shadow-inner rounded-xl w-fit">
+        {tabs.map(({ id, label, icon: Icon }) => (
+          <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all duration-200 ${
+              tab === id
+                ? 'bg-white dark:bg-wellq-dark text-wellq-dark dark:text-white shadow-sm ring-1 ring-wellq-gray/10 dark:ring-white/10'
+                : 'text-wellq-gray hover:text-wellq-dark dark:hover:text-white'
+            }`}>
+            <Icon size={16} strokeWidth={2.5} /> {label}
+          </button>
+        ))}
+      </div>
+      {tab === 'log' ? <AuditLogPanel /> : <ImpersonationConsole />}
+    </div>
+  );
+}

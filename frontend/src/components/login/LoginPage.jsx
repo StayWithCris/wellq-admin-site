@@ -19,6 +19,7 @@ import {
   resetPassword,
 } from "../../services/auth";
 import { useLanguage } from "../../contexts/LanguageContext";
+import TwoFactorChallenge from "./TwoFactorChallenge";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
@@ -50,6 +51,7 @@ export default function LoginPage({ onLoginSuccess }) {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+  const [challenge, setChallenge] = useState(null); // Rec #18: desafío de doble factor pendiente
 
   // 🔥 NUEVO: Estado para almacenar los roles de la base de datos
   const [dbRoles, setDbRoles] = useState([]);
@@ -133,7 +135,11 @@ export default function LoginPage({ onLoginSuccess }) {
     setLoading(true);
 
     try {
-      await login(email, password);
+      const res = await login(email, password);
+      if (res?.twoFactorRequired) {
+        setChallenge(res.challengeToken);
+        return;
+      }
       onLoginSuccess();
     } catch (err) {
       setError(
@@ -456,6 +462,14 @@ export default function LoginPage({ onLoginSuccess }) {
         </div>
 
         <MovingPanel mode={mode} loading={loading} switchMode={switchMode} />
+
+        {challenge && (
+          <TwoFactorChallenge
+            challengeToken={challenge}
+            onSuccess={onLoginSuccess}
+            onCancel={() => { setChallenge(null); setPassword(""); }}
+          />
+        )}
 
         <div className="md:hidden">
           <MobilePanel mode={mode} loading={loading} switchMode={switchMode} />

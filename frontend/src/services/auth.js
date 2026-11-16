@@ -54,6 +54,28 @@ export async function login(email, password) {
   }
 
   const { data } = await response.json();
+  // Rec #18: con doble factor activo el servidor aún no entrega tokens, solo un desafío
+  if (data?.two_factor_required) {
+    return { twoFactorRequired: true, challengeToken: data.challenge_token };
+  }
+  saveTokens(data);
+  return data;
+}
+
+// Rec #18: segundo paso del login (código de la app o código de respaldo)
+export async function verifyTwoFactor(challengeToken, code) {
+  const response = await fetch(`${API_BASE}/api/auth/2fa/verify`, {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify({ challenge_token: challengeToken, code }),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(typeof err.detail === "string" ? err.detail : "Código incorrecto");
+  }
+
+  const { data } = await response.json();
   saveTokens(data);
   return data;
 }

@@ -106,3 +106,50 @@ class ScheduledChange(SQLModel, table=True):
     notify_clinic: bool             = Field(default=False)
     executed_at: Optional[datetime] = Field(default=None)
     created_at: datetime            = Field(default_factory=datetime.utcnow)
+
+
+class Discount(SQLModel, table=True):
+    """
+    Mejora #4 — Descuento comercial (porcentaje o monto fijo mensual).
+    plan_id NULL = vale para todos los planes. redemptions cuenta las veces que se aplicó
+    a una clínica y no baja al revocar (es historial de uso, no de vigencia).
+    """
+    __tablename__ = "discounts"
+
+    id: Optional[int]                = Field(default=None, primary_key=True)
+    discount_id: str                 = Field(unique=True, index=True)    # "disc-xxxx"
+    code: str                        = Field(unique=True, index=True)    # "BIENVENIDA10" (mayúsculas)
+    name: str                        = Field()
+    description: Optional[str]       = Field(default=None, sa_column=Column(Text))
+    kind: str                        = Field(default="percent")          # "percent" | "fixed"
+    value: float                     = Field(default=0.0)
+    plan_id: Optional[str]           = Field(default=None, index=True)
+    duration_months: Optional[int]   = Field(default=None)               # None = sin término
+    starts_at: Optional[datetime]    = Field(default=None)
+    ends_at: Optional[datetime]      = Field(default=None)
+    max_redemptions: Optional[int]   = Field(default=None)
+    redemptions: int                 = Field(default=0)
+    is_active: bool                  = Field(default=True, index=True)
+    created_by_email: str            = Field(default="admin@wellq.co")
+    created_at: datetime             = Field(default_factory=datetime.utcnow)
+    updated_at: datetime             = Field(default_factory=datetime.utcnow)
+
+
+class ClinicDiscount(SQLModel, table=True):
+    """Mejora #4 — Descuento aplicado a una clínica (guarda el precio base y el final del momento)."""
+    __tablename__ = "clinic_discounts"
+
+    id: Optional[int]                = Field(default=None, primary_key=True)
+    assignment_id: str               = Field(unique=True, index=True)    # "cd-xxxx"
+    clinic_id: str                   = Field(index=True)
+    discount_id: str                 = Field(index=True)
+    discount_code: str               = Field()
+    plan_id: Optional[str]           = Field(default=None)               # plan vigente al aplicar
+    base_price: float                = Field(default=0.0)
+    discounted_price: float          = Field(default=0.0)
+    applied_at: datetime             = Field(default_factory=datetime.utcnow)
+    ends_at: Optional[datetime]      = Field(default=None)
+    applied_by_email: str            = Field(default="admin@wellq.co")
+    notes: Optional[str]             = Field(default=None, sa_column=Column(Text))
+    revoked_at: Optional[datetime]   = Field(default=None)
+    revoked_by_email: Optional[str]  = Field(default=None)
