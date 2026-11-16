@@ -74,6 +74,13 @@ async def create_db_tables() -> None:
         await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_plans_catalog_id ON plans (catalog_id)"))
         # Mejora #12 — asignación automática por categoría
         await conn.execute(text("ALTER TABLE ticket_categories ADD COLUMN IF NOT EXISTS auto_assign boolean NOT NULL DEFAULT false"))
+        # Mejora #18 — doble factor (TOTP) y bloqueo por intentos fallidos
+        await conn.execute(text("ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS totp_secret text DEFAULT NULL"))
+        await conn.execute(text("ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS totp_enabled boolean NOT NULL DEFAULT false"))
+        await conn.execute(text("ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS totp_backup_hashes text DEFAULT NULL"))
+        await conn.execute(text("ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS totp_last_counter integer DEFAULT NULL"))
+        await conn.execute(text("ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS totp_fail_count integer NOT NULL DEFAULT 0"))
+        await conn.execute(text("ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS totp_locked_until timestamp DEFAULT NULL"))
         await conn.execute(text("""
             DO $$
             BEGIN

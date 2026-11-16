@@ -19,6 +19,9 @@ from app.routers import sla
 from app.routers import mrr_close
 from app.routers import plan_catalogs
 from app.routers import ticket_routing
+from app.routers import discounts
+from app.routers import impersonation_console
+from app.routers import two_factor
 import structlog
 import logging
 import app.models_db  # registra todos los modelos SQLModel
@@ -149,6 +152,9 @@ app.include_router(sla.router)  # Mejora #13 — /api/sla/tickets
 app.include_router(mrr_close.router)  # Mejora #1 — /api/financials/mrr/close*
 app.include_router(plan_catalogs.router)  # Mejora #2 — /api/plan-catalogs
 app.include_router(ticket_routing.router)  # Mejora #12 — /api/ticket-routing
+app.include_router(discounts.router)  # Mejora #4 — /api/discounts
+app.include_router(impersonation_console.router)  # Mejora #14 — /api/impersonation
+app.include_router(two_factor.router)  # Mejora #18 — /api/auth/2fa/*, /api/auth/sessions
 
 
 # Registro de los nuevos componentes adaptados

@@ -96,6 +96,15 @@ class AdminUser(SQLModel, table=True):
     # El usuario activa su cuenta al primer login usando este token.
     # Se anula (NULL) una vez que el usuario completa la activación.
     invite_token: Optional[str]    = Field(default=None)
+    # ── Mejora #18 — Doble factor (TOTP) ──────────────────────────────────────
+    # El secreto se guarda cifrado (ver services/totp.py). Mientras totp_enabled sea False
+    # y exista totp_secret, la configuración está "pendiente" de confirmar con un código.
+    totp_secret: Optional[str]         = Field(default=None, sa_column=Column(Text, nullable=True))
+    totp_enabled: bool                 = Field(default=False)
+    totp_backup_hashes: Optional[str]  = Field(default=None, sa_column=Column(Text, nullable=True))  # JSON: lista de hashes
+    totp_last_counter: Optional[int]   = Field(default=None)       # último intervalo usado (anti-repetición)
+    totp_fail_count: int               = Field(default=0)
+    totp_locked_until: Optional[datetime] = Field(default=None)
 
 class PasswordResetToken(SQLModel, table=True):
     __tablename__ = "password_reset_tokens"
@@ -109,3 +118,24 @@ class PasswordResetToken(SQLModel, table=True):
     expires_at: datetime           = Field(index=True)
     used_at: Optional[datetime]    = Field(default=None)
     created_at: datetime           = Field(default_factory=datetime.utcnow)
+
+
+class AdminSession(SQLModel, table=True):
+    """
+    Mejora #18 — Sesión de un administrador (una por inicio de sesión).
+    El id viaja en los tokens como "sid". Revocarla impide renovar el token de acceso:
+    el access token ya emitido sigue valiendo hasta que expire (máx. 1 hora).
+    """
+    __tablename__ = "admin_sessions"
+
+    id: Optional[int]                = Field(default=None, primary_key=True)
+    session_id: str                  = Field(unique=True, index=True)    # "ses_xxxx"
+    user_id: str                     = Field(index=True)
+    email: str                       = Field(index=True)
+    created_at: datetime             = Field(default_factory=datetime.utcnow)
+    last_seen_at: datetime           = Field(default_factory=datetime.utcnow)
+    expires_at: datetime             = Field()
+    ip: Optional[str]                = Field(default=None)
+    user_agent: Optional[str]        = Field(default=None)
+    two_factor: bool                 = Field(default=False)              # inició con segundo factor
+    revoked_at: Optional[datetime]   = Field(default=None)

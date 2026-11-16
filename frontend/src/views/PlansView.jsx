@@ -19,6 +19,7 @@ import { filterAndSortBySearch, hasSearchQuery } from '../utils/search';
 import {
   usePlanCatalogs, PlanCatalogFilter, PlanCatalogsManager, filterPlansByCatalog, CATALOG_COLORS,
 } from '../components/plans/PlanCatalogs';
+import { DiscountsManager } from '../components/plans/Discounts';   // Mejora #4
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -1433,6 +1434,7 @@ export const PlansView = ({ searchQuery = '' }) => {
           { id: 'builder',    label: t('plans.builder'),  icon: Box    },
           { id: 'catalog',    label: t('plans.catalog'),  icon: Tag    },
           { id: 'planCatalogs', label: t('recs.pcTab'),   icon: FolderOpen },
+          { id: 'discounts',  label: t('recs.dsTab'),   icon: DollarSign },
           { id: 'archivados', label: t('plans.archived'), icon: Archive },
         ].filter(({ id }) => canManagePlans || id === 'library').map(({ id, label, icon: Icon }) => (
           <button
@@ -1486,6 +1488,11 @@ export const PlansView = ({ searchQuery = '' }) => {
               plans={plans}
               onChanged={() => { reloadCatalogs(); reloadPlans(); }}
             />
+          </motion.div>
+        )}
+        {canManagePlans && tab === 'discounts' && (
+          <motion.div key="discounts" variants={tabVariants} initial="hidden" animate="enter" exit="exit">
+            <DiscountsManager plans={plans.filter((p) => p.status !== 'archived')} />
           </motion.div>
         )}
         {canManagePlans && tab === 'builder' && editingPlan && (
