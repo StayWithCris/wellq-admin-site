@@ -187,6 +187,28 @@ export const fetchPatientHealth = (clinicId) =>
 export const fetchSyncStatus = () =>
   apiFetch('/api/sync-status');
 
+// ─── Sincronización de datos (Recomendación #7) ──────────────────────────────
+
+export const fetchSyncConfig = () =>
+  apiFetch('/api/sync/config');
+
+/** @param {6|12|24} frequencyHours */
+export const updateSyncFrequency = (frequencyHours) =>
+  apiFetch('/api/sync/config', {
+    method: 'PUT',
+    body: JSON.stringify({ frequency_hours: frequencyHours }),
+  });
+
+export const triggerSyncRun = (body = {}) =>
+  apiFetch('/api/sync/run', { method: 'POST', body: JSON.stringify(body) });
+
+export const fetchSyncHistory = (params = {}) => {
+  const qs = new URLSearchParams(
+    Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== ''))
+  ).toString();
+  return apiFetch(`/api/sync/history${qs ? `?${qs}` : ''}`);
+};
+
 // ─── Clínicas ─────────────────────────────────────────────────────────────────
 
 export const fetchClinics = (params = {}) => {

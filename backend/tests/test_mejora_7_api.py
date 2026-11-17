@@ -1,0 +1,246 @@
+"""Pruebas de API de la Recomendación #7 — Sincronización programable."""
+import json
+from datetime import datetime, timedelta
+
+from app.main import app
+from app.models_db import (
+    ActionLog,
+    Clinic,
+    ClinicianSummary,
+    PatientHealthSummary,
+    PlatformSetting,
+    SyncRun,
+)
+from app.services import sync_sources
+
+
+class _FakeCollection:
+    """Colección Mongo de mentira: guarda los pipelines que recibió."""
+
+    def __init__(self, name, docs, calls):
+        self._name = name
+        self._docs = docs
+        self._calls = calls
+
+    def aggregate(self, pipeline):
+        self._calls.append(self._name)
+        return list(self._docs)
+
+
+class _FakeMongo:
+    """Base de datos Mongo de mentira: sin red, sin credenciales."""
+
+    def __init__(self, docs_by_collection=None):
+        self._docs = docs_by_collection or {}
+        self.calls = []
+
+    def __getitem__(self, name):
+        return _FakeCollection(name, self._docs.get(name, []), self.calls)
+
+
+def test_rutas_registradas():
+    paths = {getattr(r, "path", "") for r in app.routes}
+    for p in [
+        "/api/sync-status",
+        "/api/sync/config",
+        "/api/sync/run",
+        "/api/sync/history",
+    ]:
+        assert p in paths, f"Falta la ruta {p}"
+
+
+def test_config_por_defecto(client):
+    r = client.get("/api/sync/config")
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert data["frequency_hours"] == 24
+    assert data["allowed_frequencies"] == [6, 12, 24]
+    assert data["last_run_at"] is None
+    assert data["configured"] is False
+
+
+def test_status_por_defecto_sin_token(client):
+    """GET /api/sync-status es público: SettingsView lo consume sin permisos."""
+    r = client.get("/api/sync-status")
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert len(data["sources"]) == 5
+    for source in data["sources"]:
+        assert {"key", "name", "last_sync", "status"} <= set(source)
+        assert source["status"] == "error"  # FakeSession no devuelve fechas
+
+
+def test_config_y_run_requieren_token(client):
+    assert client.put("/api/sync/config", json={"frequency_hours": 6}).status_code in (401, 403)
+    assert client.post("/api/sync/run").status_code in (401, 403)
+
+
+def test_cambiar_frecuencia(client, fake_db, auth_header):
+    r = client.put("/api/sync/config", json={"frequency_hours": 6}, headers=auth_header)
+    assert r.status_code == 200, r.text
+    data = r.json()["data"]
+    assert data["frequency_hours"] == 6
+    assert data["configured"] is True
+    assert any(isinstance(o, PlatformSetting) and o.setting_key == "sync_config" for o in fake_db.added)
+
+
+def test_cambiar_frecuencia_deja_auditoria(client, fake_db, auth_header):
+    client.put("/api/sync/config", json={"frequency_hours": 12}, headers=auth_header)
+    logs = [o for o in fake_db.added if isinstance(o, ActionLog)]
+    assert logs, "No se registró la auditoría del cambio de frecuencia"
+    assert logs[0].action == "UPDATE"
+    assert logs[0].entity_type == "sync_config"
+    assert "frequency_hours" in (logs[0].changes or "")
+
+
+def test_frecuencia_invalida(client, fake_db, auth_header):
+    assert client.put("/api/sync/config", json={"frequency_hours": 7}, headers=auth_header).status_code == 422
+
+
+def test_sincronizar_ahora_registra_historial(client, fake_db, auth_header):
+    r = client.post("/api/sync/run", headers=auth_header)
+    assert r.status_code == 200, r.text
+    run = r.json()["data"]
+    # Sin MongoDB configurado (entorno de pruebas) las fuentes Mongo se omiten:
+    # la ejecución es válida, pero parcial.
+    assert run["status"] == "partial"
+    assert run["trigger"] == "manual"
+    assert set(run["entities"]) == {
+        "clinics", "patients", "soap_notes", "tickets", "clinicians", "skipped",
+    }
+    assert run["entities"]["skipped"] == ["patients", "clinicians"]
+    assert any(isinstance(o, SyncRun) for o in fake_db.added)
+    assert any(isinstance(o, ActionLog) and o.entity_type == "sync_run" for o in fake_db.added)
+
+
+def test_sincronizacion_sin_mongo_omite_fuentes_y_no_falla(client, fake_db, auth_header):
+    """Sin `mongodb_uri` las 2 fuentes Mongo van a `skipped` y el run termina."""
+    r = client.post("/api/sync/run", headers=auth_header)
+    assert r.status_code == 200, r.text
+    run = r.json()["data"]
+    assert run["status"] != "failed"
+    assert run["entities"]["skipped"] == ["patients", "clinicians"]
+    # Las fuentes locales sí se ejecutaron: el run no se abortó.
+    assert set(run["entities"]) >= {"clinics", "soap_notes", "tickets"}
+    # No se escribió ningún resumen de pacientes ni de clínicos.
+    assert not any(isinstance(o, PatientHealthSummary) for o in fake_db.added)
+    assert not any(isinstance(o, ClinicianSummary) for o in fake_db.added)
+
+
+def test_sincronizacion_con_mongo_ingiere_patients_y_clinicians(
+    client, fake_db, auth_header, monkeypatch
+):
+    """Con Mongo disponible las fuentes agregan datos y el run queda `completed`."""
+    clinic = Clinic(
+        clinic_id="cl-1",
+        name="Clínica Uno",
+        mongo_clinic_id="507f1f77bcf86cd799439011",
+    )
+    fake_db.data[Clinic] = [clinic]
+
+    mongo = _FakeMongo({
+        "patients": [{
+            "_id": None,
+            "total_patients": 10,
+            "at_risk": 3,
+            "declining": 2,
+            "stable": 4,
+            "improving": 1,
+        }],
+        "clinicians": [{
+            "_id": "cl-1",
+            "total_clinicians": 5,
+            "active_clinicians": 4,
+            "specialties": ["Kinesiología"],
+        }],
+    })
+    monkeypatch.setattr(sync_sources, "get_mongo_db_or_none", lambda: mongo)
+
+    r = client.post("/api/sync/run", headers=auth_header)
+    assert r.status_code == 200, r.text
+    run = r.json()["data"]
+    assert run["status"] == "completed"
+    assert run["entities"]["skipped"] == []
+    assert run["entities"]["patients"] == 1
+    assert run["entities"]["clinicians"] == 1
+
+    summaries = [o for o in fake_db.added if isinstance(o, PatientHealthSummary)]
+    assert summaries, "No se escribió el resumen de pacientes"
+    assert summaries[0].clinic_id == "cl-1"
+    assert summaries[0].total_patients == 10
+    assert summaries[0].at_risk == 3
+    assert summaries[0].improving == 1
+
+    clinicians = [o for o in fake_db.added if isinstance(o, ClinicianSummary)]
+    assert clinicians, "No se escribió el resumen de clínicos"
+    assert clinicians[0].total_clinicians == 5
+    assert clinicians[0].active_clinicians == 4
+    assert json.loads(clinicians[0].specialties) == ["Kinesiología"]
+
+    # La agregación se hizo sobre la colección correcta.
+    assert mongo.calls == ["patients", "clinicians"]
+
+
+def test_mongo_roto_omite_fuentes_sin_romper_el_run(client, fake_db, auth_header, monkeypatch):
+    """Si `get_mongo_db()` falla, la fuente se omite y el run continúa."""
+    monkeypatch.setattr(
+        sync_sources, "get_mongo_db_or_none", lambda: None
+    )
+    r = client.post("/api/sync/run", headers=auth_header)
+    assert r.status_code == 200, r.text
+    run = r.json()["data"]
+    assert run["status"] == "partial"
+    assert run["entities"]["skipped"] == ["patients", "clinicians"]
+
+
+def test_sincronizacion_concurrente_devuelve_409(client, fake_db, auth_header):
+    fake_db.data[SyncRun] = [
+        SyncRun(
+            run_id="sync-en-curso",
+            trigger="manual",
+            status="running",
+            frequency_hours=24,
+            started_at=datetime.utcnow(),
+        )
+    ]
+    r = client.post("/api/sync/run", headers=auth_header)
+    assert r.status_code == 409, r.text
+    assert "sync-en-curso" in r.json()["detail"]
+
+
+def test_ejecucion_huerfana_se_cierra_y_permite_sincronizar(client, fake_db, auth_header):
+    fake_db.data[SyncRun] = [
+        SyncRun(
+            run_id="sync-huerfana",
+            trigger="manual",
+            status="running",
+            frequency_hours=24,
+            started_at=datetime.utcnow() - timedelta(minutes=30),
+        )
+    ]
+    r = client.post("/api/sync/run", headers=auth_header)
+    assert r.status_code == 200, r.text
+    assert fake_db.data[SyncRun][0].status == "failed"
+    assert fake_db.data[SyncRun][0].error == "ejecución huérfana"
+
+
+def test_historial(client, fake_db):
+    started = datetime.utcnow() - timedelta(hours=2)
+    fake_db.data[SyncRun] = [
+        SyncRun(
+            run_id="sync-1", trigger="manual", status="completed", frequency_hours=24,
+            entities='{"patients": 7}', created_by="qa@wellq.test",
+            started_at=started, completed_at=started + timedelta(seconds=2),
+        )
+    ]
+    r = client.get("/api/sync/history?limit=5")
+    assert r.status_code == 200, r.text
+    runs = r.json()["data"]
+    assert len(runs) == 1
+    assert runs[0]["id"] == "sync-1"
+    assert runs[0]["duration_ms"] == 2000
+    assert runs[0]["entities"]["patients"] == 7
+
+
+def test_historial_limite_invalido(client):
+    assert client.get("/api/sync/history?limit=0").status_code == 422

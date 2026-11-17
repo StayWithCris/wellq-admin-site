@@ -67,3 +67,26 @@ class PatientHealthSummary(SQLModel, table=True):
     stable: int            = Field(default=0)     # patients.status = "stable"
     improving: int         = Field(default=0)     # patients.status = "improving"
     recorded_at: datetime  = Field(default_factory=datetime.utcnow)  # timestamp de sync
+
+class SyncRun(SQLModel, table=True):
+    """Historial de ejecuciones de sincronización (Recomendación #7).
+
+    Cada fila representa una sincronización manual o programada. `entities`
+    guarda un JSON con los registros tocados por fuente, por ejemplo
+    ``{"clinics": 8, "patients": 45}``, para poder auditar qué se actualizó.
+
+    Estado: running | completed | failed. Una fila en `running` durante más de
+    10 minutos se considera huérfana y se cierra como `failed`.
+    """
+    __tablename__ = "sync_runs"
+
+    id: Optional[int]            = Field(default=None, primary_key=True)
+    run_id: str                  = Field(unique=True, index=True)   # "sync-{uuid4().hex[:12]}"
+    trigger: str                 = Field(default="manual")          # manual | scheduled
+    status: str                  = Field(default="running")         # running | completed | failed
+    frequency_hours: int         = Field(default=24)
+    entities: Optional[str]      = Field(default=None, sa_column=Column(Text))  # JSON
+    created_by: Optional[str]    = Field(default=None)
+    error: Optional[str]         = Field(default=None, sa_column=Column(Text))
+    started_at: datetime         = Field(default_factory=datetime.utcnow)
+    completed_at: Optional[datetime] = Field(default=None)

@@ -24,11 +24,13 @@ from app.routers import impersonation_console
 from app.routers import two_factor
 import structlog
 import logging
+import asyncio
 import app.models_db  # registra todos los modelos SQLModel
 
 
 from app.config import settings
 from app.db.neon import init_neon, close_neon, create_db_tables
+from app.services.sync_scheduler import sync_scheduler_loop
 
 # Imports de todos los routers desde app.routers
 from app.routers import (
@@ -78,16 +80,23 @@ logger = structlog.get_logger(__name__)
 async def lifespan(app: FastAPI):
     logger.info("Iniciando WellQ Admin API", entorno=settings.app_env)
 
+    scheduler_task = None
     if settings.database_url:
         init_neon()
         await create_db_tables()
         logger.info("Neon (PostgreSQL) conectado y tablas verificadas.")
+        # Recomendación #7 — sincronización programada según la frecuencia guardada
+        scheduler_task = asyncio.create_task(sync_scheduler_loop())
     else:
         logger.warning("DATABASE_URL no configurada — Neon desactivado.")
 
     yield
 
     logger.info("Cerrando WellQ Admin API...")
+
+    if scheduler_task is not None:
+        scheduler_task.cancel()
+        await asyncio.gather(scheduler_task, return_exceptions=True)
 
     if settings.database_url:
         await close_neon()

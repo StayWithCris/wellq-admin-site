@@ -6,7 +6,7 @@ from app.models.operations import Alert, Notification, Job, AppVersion, Platform
 from app.models.identity import Role, Permission, RolePermission, AdminUser, PasswordResetToken, AdminSession
 from app.models.analytics import KpiSnapshot, AppMetric, Invoice, ClinicUsageMetric, MrrSnapshot, AppUsageStat, FeatureAdoption, AdherenceSnapshot, CohortRetention, SoapQualityMetric, AiCostSnapshot, AiLatencyMetric, PoseAnalysisSnapshot, NeedsAttentionItem, InfrastructureCostSnapshot
 from app.models.infrastructure import Server, BackgroundProcess, InfraNode
-from app.models.sync import ClinicianSummary, PatientHealthSummary
+from app.models.sync import ClinicianSummary, PatientHealthSummary, SyncRun
 from app.models.support import SupportTicket, Responder, TicketCategory
 from app.models.audit import ImpersonateAuditLog, ActionLog
 
@@ -52,6 +52,7 @@ __all__ = [
     "InfraNode",
     "ClinicianSummary",
     "PatientHealthSummary",
+    "SyncRun",
     "SupportTicket",
     "Responder",
     "TicketCategory",
