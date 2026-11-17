@@ -287,4 +287,58 @@ def test_ensure_mongodb_indexes():
     assert fake_db.clinicians.indexes[0][0] == [("clinic_id", 1), ("state", 1)]
 
 
+def test_clinica_que_pasa_a_cero_registros_se_resetea():
+    """Si una clínica tenía 5 pacientes y hoy Mongo devuelve 0 docs, resetea a 0 y actualiza fecha."""
+    import asyncio
+    from datetime import datetime
+    from types import SimpleNamespace
+    from app.models_db import PatientHealthSummary
+    from app.services.sync_sources import PatientsMongoSource
+
+    source = PatientsMongoSource()
+    clinic = SimpleNamespace(clinic_id="cl-1", mongo_clinic_id="507f1f77bcf86cd799439011")
+
+    # Fila existente con 5 pacientes de ayer
+    existing_row = PatientHealthSummary(clinic_id="cl-1", total_patients=5, at_risk=2)
+
+    class FakeDB:
+        def __init__(self):
+            self.committed = False
+            self.added = []
+
+        def add(self, obj):
+            self.added.append(obj)
+
+        async def execute(self, stmt):
+            class R:
+                def scalars(self):
+                    return self
+
+                def all(self):
+                    return [existing_row]
+            return R()
+
+        async def commit(self):
+            self.committed = True
+
+    class FakeEmptyCollection:
+        def aggregate(self, pipeline):
+            return []  # MongoDB no emite docs porque $match no encontró pacientes
+
+    class FakeEmptyMongo:
+        def __getitem__(self, name):
+            return FakeEmptyCollection()
+
+    now = datetime(2026, 11, 17, 16, 0, 0)
+    db = FakeDB()
+    touched = asyncio.run(source.run(db, FakeEmptyMongo(), [clinic], now))
+
+    assert touched == 1
+    assert db.committed is True
+    assert existing_row.total_patients == 0
+    assert existing_row.at_risk == 0
+    assert existing_row.recorded_at == now
+
+
+
 

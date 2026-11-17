@@ -223,8 +223,6 @@ class MongoAggregateSource:
         # UN SOLO .aggregate() para toda la colección de MongoDB
         batch_pipeline = self.build_batch_pipeline(mongo_keys)
         docs = await _collect(mongo[self.collection].aggregate(batch_pipeline))
-        if not docs:
-            return 0
 
         touched = 0
         seen_clinic_ids: set[str] = set()
@@ -254,6 +252,23 @@ class MongoAggregateSource:
 
             row.recorded_at = now
             if not is_duplicate:
+                touched += 1
+
+        # Clínicas consultadas que tienen 0 registros en MongoDB:
+        # En Mongo, $group solo emite docs para los _id con al menos 1 registro.
+        # Si una clínica pasa a tener 0 registros, su resumen debe resetearse a 0
+        # y actualizar su recorded_at para no quedar estancada con datos obsoletos.
+        target_cids = set(id_to_clinic_id.values())
+        for cid in sorted(target_cids):
+            if cid not in seen_clinic_ids:
+                row = existing_rows.get(cid)
+                if row is None:
+                    row = self.summary_model(clinic_id=cid)
+                    db.add(row)
+                    existing_rows[cid] = row
+
+                self.apply(row, {}, accumulate=False)
+                row.recorded_at = now
                 touched += 1
 
         if touched > 0:

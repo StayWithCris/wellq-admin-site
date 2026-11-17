@@ -376,4 +376,30 @@ def test_mongo_batch_acumula_tipos_mixtos_sin_pisar(
     assert summaries[0].stable == 61
 
 
+def test_clinica_con_cero_pacientes_resetea_resumen_en_api(
+    client, fake_db, auth_header, monkeypatch
+):
+    """Verifica que si una clínica tenía 10 pacientes y hoy Mongo devuelve 0, se resetea a 0."""
+    clinic = Clinic(clinic_id="cl-1", name="Clínica Uno", mongo_clinic_id="507f1f77bcf86cd799439011")
+    fake_db.data[Clinic] = [clinic]
+
+    existing_summary = PatientHealthSummary(clinic_id="cl-1", total_patients=10, at_risk=3, stable=7)
+    fake_db.data[PatientHealthSummary] = [existing_summary]
+
+    mongo = _FakeMongo({"patients": [], "clinicians": []})
+    monkeypatch.setattr(sync_sources, "get_mongo_db_or_none", lambda: mongo)
+
+    r = client.post("/api/sync/run", headers=auth_header)
+    assert r.status_code == 200, r.text
+    run = r.json()["data"]
+    assert run["status"] == "completed"
+    assert run["entities"]["patients"] == 1
+    assert run["entities"]["clinicians"] == 1
+
+    assert existing_summary.total_patients == 0
+    assert existing_summary.at_risk == 0
+    assert existing_summary.recorded_at is not None
+
+
+
 
