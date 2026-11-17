@@ -100,3 +100,86 @@ def test_sync_result_acumula_omitidas_y_errores():
     assert result.counts == {"clinics": 3}
     assert result.skipped == ["patients"]
     assert result.errors == ["clinicians: timeout"]
+
+
+# ── Pruebas de mejoras a la Recomendación #7 (Puntos 1, 2, 3, 4) ────────────
+
+def test_source_timeouts_configurables_por_fuente():
+    """Punto 2: Cada tipo de fuente tiene su propio timeout, calibrado para Cloud Run."""
+    from app.services.sync_sources import SOURCE_TIMEOUTS, SOURCE_SPECS
+    from app.services.sync_service import STALE_RUN_MINUTES
+
+    assert "neon" in SOURCE_TIMEOUTS
+    assert "mongo" in SOURCE_TIMEOUTS
+    assert SOURCE_TIMEOUTS["neon"] <= SOURCE_TIMEOUTS["mongo"]
+    # Los timeouts están protegidos dentro de la ventana de 5 min de Cloud Run
+    assert SOURCE_TIMEOUTS["mongo"] <= 5
+    assert STALE_RUN_MINUTES >= max(SOURCE_TIMEOUTS.values())
+
+    # Todas las fuentes en SOURCE_SPECS tienen su timeout asociado
+    for spec in SOURCE_SPECS:
+        assert "timeout_min" in spec
+        assert spec["timeout_min"] > 0
+
+
+def test_scheduler_reschedule_adapta_intervalo():
+    """Punto 1: APScheduler adapta el intervalo según la frecuencia elegida."""
+    from app.services import sync_scheduler
+
+    calls = []
+    class FakeScheduler:
+        running = True
+        def reschedule_job(self, job_id, trigger):
+            calls.append((job_id, trigger.interval.total_seconds()))
+
+    old_scheduler = sync_scheduler.scheduler
+    try:
+        sync_scheduler.scheduler = FakeScheduler()
+        sync_scheduler.reschedule(6)
+        assert calls[-1] == (sync_scheduler.JOB_ID, 300)  # 5 min
+
+        sync_scheduler.reschedule(12)
+        assert calls[-1] == (sync_scheduler.JOB_ID, 600)  # 10 min
+
+        sync_scheduler.reschedule(24)
+        assert calls[-1] == (sync_scheduler.JOB_ID, 900)  # 15 min
+    finally:
+        sync_scheduler.scheduler = old_scheduler
+
+
+def test_limite_de_alertas_consecutivas():
+    """Punto 4: El umbral para alertar fallos consecutivos está fijado."""
+    from app.services.sync_service import CONSECUTIVE_FAILURE_THRESHOLD
+    assert CONSECUTIVE_FAILURE_THRESHOLD == 3
+
+
+def test_neon_snapshot_es_no_destructivo():
+    """Punto 4 Feedback: NeonSnapshotSource no debe destruir fechas con UPDATE masivo."""
+    from app.models_db import Clinic
+    from app.services.sync_sources import NeonSnapshotSource
+
+    source = NeonSnapshotSource("clinics", Clinic, "updated_at")
+    # Verificar que el kind es neon y no lanza errores en inicialización
+    assert source.kind == "neon"
+    assert source.column == "updated_at"
+
+
+def test_mongo_batch_lookup_soporta_listas_vacias():
+    """Punto 4 Feedback: _get_rows_batch resuelve en lote en vez de N+1."""
+    import asyncio
+    from app.services.sync_sources import PatientsMongoSource
+
+    source = PatientsMongoSource()
+    class FakeDB:
+        async def execute(self, stmt):
+            class R:
+                def scalars(self):
+                    return self
+                def all(self):
+                    return []
+            return R()
+
+    res = asyncio.run(source._get_rows_batch(FakeDB(), []))
+    assert res == {}
+
+

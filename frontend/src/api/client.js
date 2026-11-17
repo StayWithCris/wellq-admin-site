@@ -185,28 +185,28 @@ export const fetchPatientHealth = (clinicId) =>
   apiFetch(`/api/clinics/${clinicId}/patient-health`);
 
 export const fetchSyncStatus = () =>
-  apiFetch('/api/sync-status');
+  apiFetch('/api/v1/sync-status');
 
-// ─── Sincronización de datos (Recomendación #7) ──────────────────────────────
+// ─── Sincronización de datos (Recomendación #7 — v1) ──────────────────────────
 
 export const fetchSyncConfig = () =>
-  apiFetch('/api/sync/config');
+  apiFetch('/api/v1/sync/config');
 
 /** @param {6|12|24} frequencyHours */
 export const updateSyncFrequency = (frequencyHours) =>
-  apiFetch('/api/sync/config', {
+  apiFetch('/api/v1/sync/config', {
     method: 'PUT',
     body: JSON.stringify({ frequency_hours: frequencyHours }),
   });
 
 export const triggerSyncRun = (body = {}) =>
-  apiFetch('/api/sync/run', { method: 'POST', body: JSON.stringify(body) });
+  apiFetch('/api/v1/sync/run', { method: 'POST', body: JSON.stringify(body) });
 
 export const fetchSyncHistory = (params = {}) => {
   const qs = new URLSearchParams(
     Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== ''))
   ).toString();
-  return apiFetch(`/api/sync/history${qs ? `?${qs}` : ''}`);
+  return apiFetch(`/api/v1/sync/history${qs ? `?${qs}` : ''}`);
 };
 
 // ─── Clínicas ─────────────────────────────────────────────────────────────────

@@ -783,6 +783,8 @@
       "runStatusFailed": "Failed",
       "runStatusRunning": "Running",
       "errorLoad": "Could not load sync status",
+      "alertConsecutiveFailuresTitle": "Critical sync alert",
+      "alertConsecutiveFailuresMsg": "{{count}} consecutive sync failures detected. Please verify connectivity and data sources.",
       "entities": {
         "clinics": "Clinics",
         "patients": "Patients",

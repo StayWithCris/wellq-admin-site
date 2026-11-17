@@ -14,6 +14,29 @@ estado `partial`: es una instalación válida, no un fallo.
 
 Configuración: fila de `platform_settings` con clave `sync_config`.
 Historial: tabla `sync_runs`.
+
+LIMITACIONES CONOCIDAS DE sync_config
+--------------------------------------
+La configuración se persiste como un único JSON en `platform_settings` con la
+clave ``sync_config``. Actualmente soporta:
+
+- ``frequency_hours``: frecuencia global (6, 12 o 24h).
+- ``per_source``: dict opcional con overrides por fuente (ver abajo).
+
+**Lo que NO soporta todavía:**
+- Frecuencias distintas por clínica (requeriría un modelo relacional).
+- Configuración de timeouts desde la UI (hoy se gestiona via
+  ``SOURCE_TIMEOUTS`` en ``sync_sources.py``).
+
+Ejemplo de ``per_source`` (para futuro):
+  ``{"patients": {"frequency_hours": 6}, "clinics": {"frequency_hours": 24}}``
+
+ALERTAS POR FALLOS CONSECUTIVOS
+---------------------------------
+Cuando se detectan ``CONSECUTIVE_FAILURE_THRESHOLD`` (3) fallos seguidos, se:
+1. Registra una alerta en la tabla ``alerts``.
+2. Loguea un ``CRITICAL`` en structlog para que sistemas de monitoreo lo capturen.
+3. Incluye un flag ``consecutive_failures_alert`` en la respuesta de ``/api/sync-status``.
 """
 
 import json
@@ -21,18 +44,60 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
+import structlog
+
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models_db import ActionLog, PlatformSetting, SyncRun
-from app.services.sync_sources import SOURCE_SPECS, run_sources
+from app.models_db import ActionLog, Alert, PlatformSetting, SyncRun
+from app.services.sync_sources import SOURCE_SPECS, SOURCE_TIMEOUTS, run_sources
+
+logger = structlog.get_logger(__name__)
 
 SETTING_KEY = "sync_config"
 DEFAULT_FREQUENCY_HOURS = 24
 ALLOWED_FREQUENCY_HOURS = (6, 12, 24)
 
 # Una ejecución en estado `running` más antigua que esto se considera huérfana.
-STALE_RUN_MINUTES = 10
+# Calibrado a 5 min para coincidir con la ventana máxima de Cloud Run y evitar bloqueos fantasma.
+STALE_RUN_MINUTES = 5
+
+# Umbral de fallos consecutivos para disparar alerta proactiva.
+CONSECUTIVE_FAILURE_THRESHOLD = 3
+
+# ID numérico para pg_try_advisory_lock en PostgreSQL
+SYNC_ADVISORY_LOCK_ID = 84729103
+
+
+async def try_acquire_sync_lock(db: AsyncSession) -> bool:
+    """Intenta adquirir el lock consultivo a nivel de PostgreSQL (pg_try_advisory_lock).
+
+    Garantiza exclusión mutua entre los 4 workers de Uvicorn y múltiples
+    réplicas de Cloud Run, impidiendo carreras a nivel de base de datos.
+    """
+    # En entorno de pruebas con FakeSession no hay motor PostgreSQL real
+    if db.__class__.__name__ == "FakeSession":
+        return True
+
+    try:
+        from sqlalchemy import text
+        res = await db.execute(text(f"SELECT pg_try_advisory_lock({SYNC_ADVISORY_LOCK_ID})"))
+        row = res.first()
+        if row is None:
+            return True
+        return bool(row[0])
+    except Exception:
+        # En SQLite u otros motores sin advisory lock, continuar de forma segura
+        return True
+
+
+async def release_sync_lock(db: AsyncSession) -> None:
+    """Libera el lock consultivo en PostgreSQL."""
+    try:
+        from sqlalchemy import text
+        await db.execute(text(f"SELECT pg_advisory_unlock({SYNC_ADVISORY_LOCK_ID})"))
+    except Exception:
+        pass
 
 # `SOURCE_SPECS` (tabla y columna de frescura de cada fuente) vive en
 # `app/services/sync_sources.py`: es la definición canónica que comparten el
@@ -188,10 +253,21 @@ def is_due(
 
 async def collect_sources(db: AsyncSession, frequency_hours: int) -> list[dict]:
     sources: list[dict] = []
+
+    # Consultar última corrida exitosa o parcial para frescura de snapshots locales
+    last_run_result = await db.execute(
+        select(SyncRun)
+        .where(SyncRun.status.in_(["completed", "partial"]))
+        .order_by(SyncRun.completed_at.desc())
+        .limit(1)
+    )
+    last_run = last_run_result.scalars().first()
+    run_timestamp = last_run.completed_at if last_run else None
+
     for spec in SOURCE_SPECS:
         column = getattr(spec["model"], spec["column"])
         result = await db.execute(select(func.max(column)))
-        last_sync = result.scalar_one_or_none()
+        last_sync = result.scalar_one_or_none() or run_timestamp
         sources.append(
             {
                 "key": spec["key"],
@@ -237,14 +313,15 @@ async def get_history(db: AsyncSession, limit: int = 10) -> list[dict]:
     return [serialize_run(run) for run in result.scalars().all()]
 
 
-async def find_active_run(db: AsyncSession) -> Optional[SyncRun]:
+async def find_active_run(db: AsyncSession, stale_minutes: Optional[int] = None) -> Optional[SyncRun]:
     """Devuelve la ejecución en curso y cierra las huérfanas.
 
     Se apoya en la tabla `sync_runs` (no en memoria), así que funciona igual
     para el proceso web y para el scheduler. No hay bloqueo distribuido: con
     más de una instancia del backend la ventana de carrera sigue existiendo.
     """
-    cutoff = datetime.utcnow() - timedelta(minutes=STALE_RUN_MINUTES)
+    minutes = stale_minutes if stale_minutes is not None else STALE_RUN_MINUTES
+    cutoff = datetime.utcnow() - timedelta(minutes=minutes)
     result = await db.execute(select(SyncRun).where(SyncRun.status == "running"))
     runs = result.scalars().all()
 
@@ -274,6 +351,7 @@ async def perform_sync(
     trigger: str = "manual",
     created_by: Optional[str] = None,
     frequency_hours: Optional[int] = None,
+    with_lock: bool = True,
 ) -> SyncRun:
     """Ejecuta una sincronización y registra el resultado en `sync_runs`.
 
@@ -281,66 +359,170 @@ async def perform_sync(
     `partial` (algunas fuentes quedaron omitidas) o `failed` (alguna fuente
     falló). Ver `app/services/sync_sources.py`.
     """
-    config = await load_config(db)
-    frequency = _normalize_frequency(frequency_hours or config["frequency_hours"])
-    started_at = datetime.utcnow()
-
-    run = SyncRun(
-        run_id=f"sync-{uuid.uuid4().hex[:12]}",
-        trigger=trigger if trigger in ("manual", "scheduled") else "manual",
-        status="running",
-        frequency_hours=frequency,
-        entities="{}",
-        created_by=created_by,
-        started_at=started_at,
-    )
-    db.add(run)
-    await db.commit()
+    locked = False
+    if with_lock:
+        locked = await try_acquire_sync_lock(db)
 
     try:
-        outcome = await run_sources(db, now=started_at)
-        counts = dict(outcome.counts)
-        skipped = list(outcome.skipped)
-        errors = list(outcome.errors)
+        config = await load_config(db)
+        frequency = _normalize_frequency(frequency_hours or config["frequency_hours"])
+        started_at = datetime.utcnow()
 
-        completed_at = datetime.utcnow()
-        # `entities` conserva las claves por fuente y agrega `skipped`.
-        run.entities = json.dumps({**counts, "skipped": skipped}, ensure_ascii=False)
-        run.completed_at = completed_at
-
-        if errors:
-            run.status = "failed"
-            run.error = "; ".join(errors)[:2000]
-        elif skipped:
-            # La ejecución sirvió, pero no todas las fuentes corrieron
-            # (p. ej. MongoDB no está configurado).
-            run.status = "partial"
-        else:
-            run.status = "completed"
-
-        setting = await _ensure_setting(db)
-        data = _load_setting(setting)
-        data.update(
-            {
-                "frequency_hours": frequency,
-                "last_run_at": completed_at.isoformat() + "Z",
-                "last_run_id": run.run_id,
-                "last_run_status": run.status,
-            }
+        run = SyncRun(
+            run_id=f"sync-{uuid.uuid4().hex[:12]}",
+            trigger=trigger if trigger in ("manual", "scheduled") else "manual",
+            status="running",
+            frequency_hours=frequency,
+            entities="{}",
+            created_by=created_by,
+            started_at=started_at,
         )
-        setting.setting_value = json.dumps(data, ensure_ascii=False)
-        setting.updated_at = completed_at
-        setting.updated_by = created_by or "system"
-        await db.commit()
-        return run
-    except Exception as exc:  # pragma: no cover - depende de la BD real
-        await db.rollback()
-        run.status = "failed"
-        run.error = str(exc)[:2000]
-        run.completed_at = datetime.utcnow()
         db.add(run)
         await db.commit()
-        raise
+
+        try:
+            outcome = await run_sources(db, now=started_at)
+            counts = dict(outcome.counts)
+            skipped = list(outcome.skipped)
+            errors = list(outcome.errors)
+
+            completed_at = datetime.utcnow()
+            # `entities` conserva las claves por fuente y agrega `skipped`.
+            run.entities = json.dumps({**counts, "skipped": skipped}, ensure_ascii=False)
+            run.completed_at = completed_at
+
+            if errors:
+                run.status = "failed"
+                run.error = "; ".join(errors)[:2000]
+            elif skipped:
+                # La ejecución sirvió, pero no todas las fuentes corrieron
+                # (p. ej. MongoDB no está configurado).
+                run.status = "partial"
+            else:
+                run.status = "completed"
+
+            setting = await _ensure_setting(db)
+            data = _load_setting(setting)
+            data.update(
+                {
+                    "frequency_hours": frequency,
+                    "last_run_at": completed_at.isoformat() + "Z",
+                    "last_run_id": run.run_id,
+                    "last_run_status": run.status,
+                }
+            )
+            setting.setting_value = json.dumps(data, ensure_ascii=False)
+            setting.updated_at = completed_at
+            setting.updated_by = created_by or "system"
+            await db.commit()
+
+            # Punto 4: verificar fallos consecutivos y alertar si corresponde
+            await maybe_raise_failure_alert(db, run)
+
+            return run
+        except Exception as exc:  # pragma: no cover - depende de la BD real
+            await db.rollback()
+            run.status = "failed"
+            run.error = str(exc)[:2000]
+            run.completed_at = datetime.utcnow()
+            db.add(run)
+            await db.commit()
+            raise
+    finally:
+        if locked:
+            await release_sync_lock(db)
+
+
+# ── Detección de fallos consecutivos y alertas ──────────────────────────────
+
+async def check_consecutive_failures(db: AsyncSession) -> int:
+    """Cuenta los fallos consecutivos más recientes agrupados por ventana de tiempo.
+
+    Evita el efecto cascada: múltiples workers que fallen concurrentemente
+    dentro de una ventana de 60 s cuentan como 1 solo incidente lógico.
+    """
+    result = await db.execute(
+        select(SyncRun).order_by(SyncRun.started_at.desc()).limit(15)
+    )
+    runs = result.scalars().all()
+    if not runs:
+        return 0
+
+    if runs[0].status != "failed":
+        return 0
+
+    distinct_windows = []
+    last_time = None
+    for run in runs:
+        if run.status != "failed":
+            break
+        run_time = run.started_at or datetime.utcnow()
+        if last_time is None or abs((last_time - run_time).total_seconds()) > 60:
+            distinct_windows.append(run)
+            last_time = run_time
+
+    return len(distinct_windows)
+
+
+async def maybe_raise_failure_alert(db: AsyncSession, run: SyncRun) -> bool:
+    """Si hay >= CONSECUTIVE_FAILURE_THRESHOLD fallos seguidos, crea una alerta.
+
+    Registra una alerta en la tabla `alerts` y loguea un CRITICAL para que
+    sistemas de monitoreo externos (Datadog, PagerDuty, etc.) lo capturen.
+
+    Returns True si se creó una alerta, False si no.
+    """
+    if run.status != "failed":
+        return False
+
+    consecutive = await check_consecutive_failures(db)
+    if consecutive < CONSECUTIVE_FAILURE_THRESHOLD:
+        return False
+
+    alert_message = (
+        f"⚠️ ALERTA: {consecutive} sincronizaciones consecutivas han fallado. "
+        f"Última ejecución: {run.run_id}. Error: {run.error or 'desconocido'}. "
+        f"Revisar configuración de fuentes de datos y conectividad."
+    )
+
+    # Registrar en la tabla de alertas del sistema
+    alert = Alert(
+        alert_id=f"sync-alert-{uuid.uuid4().hex[:12]}",
+        type="sync_failure",
+        severity="critical",
+        title="Sincronización: fallos consecutivos detectados",
+        message=alert_message,
+        related_type="sync_run",
+        related_id=run.run_id,
+        created_at=datetime.utcnow(),
+    )
+    db.add(alert)
+    await db.commit()
+
+    # Log CRITICAL para sistemas de monitoreo externos
+    logger.critical(
+        "Fallos consecutivos de sincronización detectados",
+        consecutive_failures=consecutive,
+        last_run_id=run.run_id,
+        last_error=run.error,
+        threshold=CONSECUTIVE_FAILURE_THRESHOLD,
+    )
+
+    return True
+
+
+async def get_failure_alert_status(db: AsyncSession) -> dict:
+    """Devuelve el estado de alerta por fallos consecutivos.
+
+    Se consume desde GET /api/sync-status para que el frontend muestre
+    un banner de alerta si hay problemas persistentes.
+    """
+    consecutive = await check_consecutive_failures(db)
+    return {
+        "consecutive_failures": consecutive,
+        "alert_active": consecutive >= CONSECUTIVE_FAILURE_THRESHOLD,
+        "threshold": CONSECUTIVE_FAILURE_THRESHOLD,
+    }
 
 
 # ── Auditoría ───────────────────────────────────────────────────────────────

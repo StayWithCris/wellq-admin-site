@@ -30,7 +30,7 @@ import app.models_db  # registra todos los modelos SQLModel
 
 from app.config import settings
 from app.db.neon import init_neon, close_neon, create_db_tables
-from app.services.sync_scheduler import sync_scheduler_loop
+from app.services.sync_scheduler import start_scheduler, shutdown_scheduler
 
 # Imports de todos los routers desde app.routers
 from app.routers import (
@@ -85,8 +85,8 @@ async def lifespan(app: FastAPI):
         init_neon()
         await create_db_tables()
         logger.info("Neon (PostgreSQL) conectado y tablas verificadas.")
-        # Recomendación #7 — sincronización programada según la frecuencia guardada
-        scheduler_task = asyncio.create_task(sync_scheduler_loop())
+        # Recomendación #7 — APScheduler con cron en vez de asyncio loop
+        start_scheduler()
     else:
         logger.warning("DATABASE_URL no configurada — Neon desactivado.")
 
@@ -94,9 +94,8 @@ async def lifespan(app: FastAPI):
 
     logger.info("Cerrando WellQ Admin API...")
 
-    if scheduler_task is not None:
-        scheduler_task.cancel()
-        await asyncio.gather(scheduler_task, return_exceptions=True)
+    # Recomendación #7 — detener APScheduler limpiamente
+    shutdown_scheduler()
 
     if settings.database_url:
         await close_neon()

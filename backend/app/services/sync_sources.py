@@ -23,6 +23,7 @@ Mongo configurado, no un error.
 
 from __future__ import annotations
 
+import asyncio
 import json
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -39,6 +40,16 @@ from app.models_db import (
     SupportTicket,
 )
 
+# ── Timeouts configurables por tipo de fuente (en minutos) ──────────────────
+# Calibrados para mantenerse estrictamente por debajo del timeout por defecto
+# de Google Cloud Run (5 minutos / 300 s) y reverse proxies (Vercel).
+SOURCE_TIMEOUTS: dict[str, int] = {
+    "neon": 1,       # 1 minuto (60 s) — snapshots y conteos locales
+    "mongo": 2,      # 2 minutos (120 s) — agregación en MongoDB Atlas
+}
+
+DEFAULT_TIMEOUT_MINUTES = 2
+
 # ── Definición canónica de las fuentes ─────────────────────────────────────
 #
 # El orden es el que ve el panel: clínicas, pacientes, notas SOAP, tickets y
@@ -46,11 +57,11 @@ from app.models_db import (
 # que muestra la UI y lo que se ejecuta nunca se desincronicen.
 
 SOURCE_SPECS: tuple[dict[str, Any], ...] = (
-    {"key": "clinics", "name": "Clinics", "model": Clinic, "column": "updated_at", "kind": "neon"},
-    {"key": "patients", "name": "Patient Health Summaries", "model": PatientHealthSummary, "column": "recorded_at", "kind": "mongo"},
-    {"key": "soap_notes", "name": "SOAP Notes", "model": SoapQualityMetric, "column": "recorded_at", "kind": "neon"},
-    {"key": "tickets", "name": "Support Tickets", "model": SupportTicket, "column": "recorded_at", "kind": "neon"},
-    {"key": "clinicians", "name": "Clinician Summaries", "model": ClinicianSummary, "column": "recorded_at", "kind": "mongo"},
+    {"key": "clinics", "name": "Clinics", "model": Clinic, "column": "updated_at", "kind": "neon", "timeout_min": SOURCE_TIMEOUTS["neon"]},
+    {"key": "patients", "name": "Patient Health Summaries", "model": PatientHealthSummary, "column": "recorded_at", "kind": "mongo", "timeout_min": SOURCE_TIMEOUTS["mongo"]},
+    {"key": "soap_notes", "name": "SOAP Notes", "model": SoapQualityMetric, "column": "recorded_at", "kind": "neon", "timeout_min": SOURCE_TIMEOUTS["neon"]},
+    {"key": "tickets", "name": "Support Tickets", "model": SupportTicket, "column": "recorded_at", "kind": "neon", "timeout_min": SOURCE_TIMEOUTS["neon"]},
+    {"key": "clinicians", "name": "Clinician Summaries", "model": ClinicianSummary, "column": "recorded_at", "kind": "mongo", "timeout_min": SOURCE_TIMEOUTS["mongo"]},
 )
 
 
@@ -114,14 +125,14 @@ def _object_id(value: str) -> Any:
         return value
 
 
-# ── Fuente local (snapshot) ─────────────────────────────────────────────────
+# ── Fuente local (snapshot / conteo no destructivo) ─────────────────────────
 
 class NeonSnapshotSource:
-    """Refresca la marca de frescura de una tabla agregada local.
+    """Verifica y cuenta los registros vigentes de una tabla local.
 
-    No ingiere datos: `clinics`, `soap_notes` y `tickets` son snapshots
-    locales por diseño. El único efecto es mover su timestamp a la marca de
-    la ejecución actual, que es lo que el panel muestra como «frescura».
+    NO ejecuta UPDATE masivo sin WHERE: respeta las fechas históricas reales
+    (updated_at / recorded_at) de clínicas, tickets y notas SOAP, evitando
+    bloat de dead tuples y duplicación de páginas en Neon/PostgreSQL.
     """
 
     kind = "neon"
@@ -132,12 +143,14 @@ class NeonSnapshotSource:
         self.column = column
 
     async def run(self, db: AsyncSession, now: datetime) -> int:
-        stmt = update(self.model).values({self.column: now})
+        stmt = select(self.model)
+        if hasattr(self.model, "is_deleted"):
+            stmt = stmt.where(self.model.is_deleted.is_(False))
         result = await db.execute(stmt)
-        return max(int(getattr(result, "rowcount", 0) or 0), 0)
+        return len(result.scalars().all())
 
 
-# ── Fuente MongoDB (agregación real) ────────────────────────────────────────
+# ── Fuente MongoDB (agregación con precarga por lote sin N+1) ──────────────
 
 class MongoAggregateSource:
     """Agrega una colección de MongoDB y hace upsert en su tabla resumen.
@@ -165,6 +178,15 @@ class MongoAggregateSource:
         )
         return result.scalars().first()
 
+    async def _get_rows_batch(self, db: AsyncSession, clinic_ids: list[str]) -> dict[str, Any]:
+        """Precarga en UNA sola consulta todas las filas de resumen (elimina N+1)."""
+        if not clinic_ids:
+            return {}
+        result = await db.execute(
+            select(self.summary_model).where(self.summary_model.clinic_id.in_(clinic_ids))
+        )
+        return {r.clinic_id: r for r in result.scalars().all() if getattr(r, "clinic_id", None)}
+
     async def run(
         self,
         db: AsyncSession,
@@ -174,11 +196,19 @@ class MongoAggregateSource:
     ) -> int:
         """Agrega cada clínica con `mongo_clinic_id` y actualiza su resumen.
 
-        Devuelve el número de clínicas agregadas. Las clínicas sin
-        `mongo_clinic_id` se ignoran: no hay forma de ubicarlas en Mongo.
+        Elimina el antipatrón N+1: precarga todas las filas resumen en una sola
+        consulta y hace commit en bloque al final.
         """
+        clinics_list = list(clinics)
+        if not clinics_list:
+            return 0
+
+        # Precargar todas las filas en 1 sola consulta
+        clinic_ids = [c.clinic_id for c in clinics_list if getattr(c, "clinic_id", None)]
+        existing_rows = await self._get_rows_batch(db, clinic_ids)
+
         touched = 0
-        for clinic in clinics:
+        for clinic in clinics_list:
             mongo_clinic_id = getattr(clinic, "mongo_clinic_id", None)
             if not mongo_clinic_id:
                 continue
@@ -188,16 +218,18 @@ class MongoAggregateSource:
             if not docs:
                 continue
 
-            row = await self._get_row(db, clinic.clinic_id)
+            row = existing_rows.get(clinic.clinic_id)
             if row is None:
                 row = self.summary_model(clinic_id=clinic.clinic_id)
                 db.add(row)
+                existing_rows[clinic.clinic_id] = row
 
             self.apply(row, docs[0])
             row.recorded_at = now
             touched += 1
 
-        await db.commit()
+        if touched > 0:
+            await db.commit()
         return touched
 
 
@@ -316,13 +348,20 @@ async def run_sources(
 
     Las fuentes locales siempre corren. Las de Mongo solo si hay una base de
     datos disponible; en caso contrario quedan en `skipped`.
+
+    Cada fuente tiene un timeout configurable (`SOURCE_TIMEOUTS`): si una
+    fuente excede su tiempo, se marca como error y la ejecución continúa.
     """
     moment = now or datetime.utcnow()
     outcome = SyncResult()
 
     for source in SNAPSHOT_SOURCES:
+        timeout = SOURCE_TIMEOUTS.get("neon", DEFAULT_TIMEOUT_MINUTES) * 60
         try:
-            outcome.add_count(source.key, await source.run(db, moment))
+            count = await asyncio.wait_for(source.run(db, moment), timeout=timeout)
+            outcome.add_count(source.key, count)
+        except asyncio.TimeoutError:
+            outcome.add_error(source.key, f"timeout ({timeout // 60} min)")
         except Exception as exc:
             outcome.add_error(source.key, str(exc))
 
@@ -342,8 +381,14 @@ async def run_sources(
             outcome.add_error(source.key, f"no se pudieron leer las clínicas: {exc}")
 
     for source in MONGO_SOURCES:
+        timeout = SOURCE_TIMEOUTS.get("mongo", DEFAULT_TIMEOUT_MINUTES) * 60
         try:
-            outcome.add_count(source.key, await source.run(db, mongo, clinics, moment))
+            count = await asyncio.wait_for(
+                source.run(db, mongo, clinics, moment), timeout=timeout
+            )
+            outcome.add_count(source.key, count)
+        except asyncio.TimeoutError:
+            outcome.add_error(source.key, f"timeout ({timeout // 60} min)")
         except Exception as exc:
             outcome.add_error(source.key, str(exc))
 

@@ -244,3 +244,69 @@ def test_historial(client, fake_db):
 
 def test_historial_limite_invalido(client):
     assert client.get("/api/sync/history?limit=0").status_code == 422
+
+
+# ── Pruebas de mejoras (v1, alertas y compatibilidad) ────────────────────────
+
+def test_rutas_v1_registradas():
+    """Punto 5: Los endpoints están expuestos en /api/v1/ y en /api/ (legacy)."""
+    paths = {getattr(r, "path", "") for r in app.routes}
+    for p in [
+        "/api/v1/sync-status",
+        "/api/v1/sync/config",
+        "/api/v1/sync/run",
+        "/api/v1/sync/history",
+        "/api/sync-status",
+        "/api/sync/config",
+        "/api/sync/run",
+        "/api/sync/history",
+    ]:
+        assert p in paths, f"Falta la ruta {p}"
+
+
+def test_endpoints_v1_funcionan_identicos(client):
+    """Punto 5: /api/v1/sync/config y /api/v1/sync-status devuelven 200."""
+    r_v1 = client.get("/api/v1/sync/config")
+    r_legacy = client.get("/api/sync/config")
+    assert r_v1.status_code == 200
+    assert r_legacy.status_code == 200
+    assert r_v1.json() == r_legacy.json()
+
+    s_v1 = client.get("/api/v1/sync-status")
+    s_legacy = client.get("/api/sync-status")
+    assert s_v1.status_code == 200
+    assert s_legacy.status_code == 200
+    assert "failure_alert" in s_v1.json()
+    assert s_v1.json()["failure_alert"]["alert_active"] is False
+
+
+def test_alerta_fallos_consecutivos(client, fake_db):
+    """Punto 4: 3 fallos consecutivos disparan flag de alerta activa."""
+    now = datetime.utcnow()
+    fake_db.data[SyncRun] = [
+        SyncRun(run_id="run-3", trigger="manual", status="failed", error="timeout", started_at=now),
+        SyncRun(run_id="run-2", trigger="scheduled", status="failed", error="conn error", started_at=now - timedelta(hours=1)),
+        SyncRun(run_id="run-1", trigger="scheduled", status="failed", error="timeout", started_at=now - timedelta(hours=2)),
+    ]
+    r = client.get("/api/v1/sync-status")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["failure_alert"]["alert_active"] is True
+    assert data["failure_alert"]["consecutive_failures"] == 3
+
+
+def test_alerta_cascada_simultanea_no_dispara_falsa_alarma(client, fake_db):
+    """Efecto cascada: 3 fallos simultáneos en el mismo segundo cuentan como 1 incidente."""
+    now = datetime.utcnow()
+    fake_db.data[SyncRun] = [
+        SyncRun(run_id="run-w3", trigger="scheduled", status="failed", error="timeout", started_at=now),
+        SyncRun(run_id="run-w2", trigger="scheduled", status="failed", error="timeout", started_at=now - timedelta(seconds=2)),
+        SyncRun(run_id="run-w1", trigger="scheduled", status="failed", error="timeout", started_at=now - timedelta(seconds=4)),
+    ]
+    r = client.get("/api/v1/sync-status")
+    assert r.status_code == 200
+    data = r.json()
+    # No dispara la alerta crítica (solo 1 ventana lógica de fallo)
+    assert data["failure_alert"]["alert_active"] is False
+    assert data["failure_alert"]["consecutive_failures"] == 1
+

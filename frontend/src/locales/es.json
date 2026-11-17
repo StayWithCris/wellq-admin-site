@@ -783,6 +783,8 @@
       "runStatusFailed": "Fallida",
       "runStatusRunning": "En curso",
       "errorLoad": "No se pudo cargar el estado de sincronización",
+      "alertConsecutiveFailuresTitle": "Alerta crítica de sincronización",
+      "alertConsecutiveFailuresMsg": "Se han detectado {{count}} fallos consecutivos en la sincronización. Revisa la conectividad y las fuentes de datos.",
       "entities": {
         "clinics": "Clínicas",
         "patients": "Pacientes",

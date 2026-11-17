@@ -144,6 +144,7 @@ export const SyncPanel = ({ searchQuery = '' }) => {
   const [sources, setSources] = useState([]);
   const [config, setConfig] = useState(null);
   const [runs, setRuns] = useState([]);
+  const [failureAlert, setFailureAlert] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [savingFrequency, setSavingFrequency] = useState(false);
@@ -162,6 +163,7 @@ export const SyncPanel = ({ searchQuery = '' }) => {
       setSources(statusRes?.sources ?? []);
       setConfig(configRes ?? null);
       setRuns(historyRes?.data ?? []);
+      setFailureAlert(statusRes?.failure_alert ?? null);
     } catch (err) {
       if (!silent) setError(err.message);
     } finally {
@@ -296,6 +298,21 @@ export const SyncPanel = ({ searchQuery = '' }) => {
           )}
         </div>
       </div>
+
+      {/* Alerta de fallos consecutivos (#4) */}
+      {failureAlert?.alert_active && (
+        <div className="mb-5 flex items-start gap-3 rounded-xl bg-red-500/10 border border-red-500/30 p-3.5 text-red-600 dark:text-red-400">
+          <AlertTriangle size={18} className="shrink-0 mt-0.5 text-red-500" />
+          <div className="min-w-0 flex-1">
+            <h4 className="text-xs font-bold uppercase tracking-wider">
+              {t('platform.sync.alertConsecutiveFailuresTitle')}
+            </h4>
+            <p className="text-xs mt-0.5">
+              {t('platform.sync.alertConsecutiveFailuresMsg', { count: failureAlert.consecutive_failures })}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Frecuencia */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-5 pb-5 border-b border-wellq-gray/10 dark:border-white/5">
