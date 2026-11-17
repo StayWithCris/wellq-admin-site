@@ -177,7 +177,7 @@ class MongoAggregateSource:
         """Pipeline individual (retrocompatibilidad)."""
         raise NotImplementedError
 
-    def apply(self, row: Any, aggregate: dict) -> None:
+    def apply(self, row: Any, aggregate: dict, accumulate: bool = False) -> None:
         raise NotImplementedError
 
     async def _get_row(self, db: AsyncSession, clinic_id: str) -> Optional[Any]:
@@ -227,6 +227,7 @@ class MongoAggregateSource:
             return 0
 
         touched = 0
+        seen_clinic_ids: set[str] = set()
         for doc in docs:
             doc_id = doc.get("_id")
             # Resolver el clinic_id de PostgreSQL para el grupo
@@ -246,9 +247,14 @@ class MongoAggregateSource:
                 db.add(row)
                 existing_rows[target_clinic_id] = row
 
-            self.apply(row, doc)
+            # Si existieran grupos mixtos, acumular métricas en vez de pisarlas
+            is_duplicate = target_clinic_id in seen_clinic_ids
+            self.apply(row, doc, accumulate=is_duplicate)
+            seen_clinic_ids.add(target_clinic_id)
+
             row.recorded_at = now
-            touched += 1
+            if not is_duplicate:
+                touched += 1
 
         if touched > 0:
             await db.commit()
@@ -291,7 +297,7 @@ class PatientsMongoSource(MongoAggregateSource):
             {"$match": {"clinic_ids": {"$in": mongo_keys}}},
             {
                 "$group": {
-                    "_id": "$clinic_ids",
+                    "_id": {"$toString": "$clinic_ids"},
                     "total_patients": {"$sum": 1},
                     "at_risk": {"$sum": {"$cond": [{"$eq": ["$status", "at_risk"]}, 1, 0]}},
                     "declining": {"$sum": {"$cond": [{"$eq": ["$status", "declining"]}, 1, 0]}},
@@ -317,12 +323,25 @@ class PatientsMongoSource(MongoAggregateSource):
             },
         ]
 
-    def apply(self, row: Any, aggregate: dict) -> None:
-        row.total_patients = _as_int(aggregate.get("total_patients"))
-        row.at_risk = _as_int(aggregate.get("at_risk"))
-        row.declining = _as_int(aggregate.get("declining"))
-        row.stable = _as_int(aggregate.get("stable"))
-        row.improving = _as_int(aggregate.get("improving"))
+    def apply(self, row: Any, aggregate: dict, accumulate: bool = False) -> None:
+        total = _as_int(aggregate.get("total_patients"))
+        at_risk = _as_int(aggregate.get("at_risk"))
+        declining = _as_int(aggregate.get("declining"))
+        stable = _as_int(aggregate.get("stable"))
+        improving = _as_int(aggregate.get("improving"))
+
+        if accumulate:
+            row.total_patients = _as_int(row.total_patients) + total
+            row.at_risk = _as_int(row.at_risk) + at_risk
+            row.declining = _as_int(row.declining) + declining
+            row.stable = _as_int(row.stable) + stable
+            row.improving = _as_int(row.improving) + improving
+        else:
+            row.total_patients = total
+            row.at_risk = at_risk
+            row.declining = declining
+            row.stable = stable
+            row.improving = improving
 
 
 class CliniciansMongoSource(MongoAggregateSource):
@@ -374,9 +393,9 @@ class CliniciansMongoSource(MongoAggregateSource):
             },
         ]
 
-    def apply(self, row: Any, aggregate: dict) -> None:
-        row.total_clinicians = _as_int(aggregate.get("total_clinicians"))
-        row.active_clinicians = _as_int(aggregate.get("active_clinicians"))
+    def apply(self, row: Any, aggregate: dict, accumulate: bool = False) -> None:
+        total = _as_int(aggregate.get("total_clinicians"))
+        active = _as_int(aggregate.get("active_clinicians"))
         specialties = aggregate.get("specialties") or []
         flat_specialties = []
         if isinstance(specialties, (list, tuple, set)):
@@ -387,7 +406,21 @@ class CliniciansMongoSource(MongoAggregateSource):
                     flat_specialties.append(item)
         elif isinstance(specialties, str):
             flat_specialties.append(specialties)
-        row.specialties = json.dumps(list(dict.fromkeys(flat_specialties)), ensure_ascii=False)
+
+        if accumulate:
+            row.total_clinicians = _as_int(row.total_clinicians) + total
+            row.active_clinicians = _as_int(row.active_clinicians) + active
+            existing_spec = []
+            try:
+                existing_spec = json.loads(row.specialties or "[]")
+            except Exception:
+                pass
+            combined = list(dict.fromkeys(existing_spec + flat_specialties))
+            row.specialties = json.dumps(combined, ensure_ascii=False)
+        else:
+            row.total_clinicians = total
+            row.active_clinicians = active
+            row.specialties = json.dumps(list(dict.fromkeys(flat_specialties)), ensure_ascii=False)
 
 
 # ── Catálogo de fuentes ─────────────────────────────────────────────────────

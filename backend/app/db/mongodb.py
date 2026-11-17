@@ -7,6 +7,7 @@ agregaciones complejas que son más eficientes en MongoDB
 que en Firestore (ventana de tiempo, group by, histogramas, etc.).
 """
 
+import asyncio
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 import structlog
 
@@ -23,7 +24,8 @@ def init_mongodb() -> None:
     """
     Crea el cliente Motor y selecciona la base de datos configurada.
     Motor es lazy: la conexión TCP real se establece en el primer request.
-    Debe llamarse una vez al arrancar la app.
+    Debe llamarse una vez al arrancar la app. Si hay un event loop activo,
+    despacha la creación de índices en segundo plano.
     """
     global _mongo_client, _mongo_db
 
@@ -44,6 +46,14 @@ def init_mongodb() -> None:
             "Cliente MongoDB (Motor) inicializado",
             base_de_datos=settings.mongodb_db_name,
         )
+
+        # Si hay un event loop asíncrono activo, asegurar índices automáticamente
+        try:
+            loop = asyncio.get_running_loop()
+            if loop.is_running():
+                loop.create_task(ensure_mongodb_indexes(_mongo_db))
+        except RuntimeError:
+            pass
 
     except Exception as e:
         logger.error("Error al inicializar Motor/MongoDB", error=str(e))
@@ -108,8 +118,9 @@ async def ensure_mongodb_indexes(db: AsyncIOMotorDatabase | None = None) -> list
         logger.info("Índice creado en colección clinicians", index=idx_clinicians)
 
     except Exception as exc:
-        logger.error("Error al crear índices en MongoDB", error=str(exc))
-        raise
+        logger.warning("No se pudieron asegurar índices en MongoDB", error=str(exc))
+        # Retornar los índices alcanzados sin romper el arranque de la app si Mongo está inalcanzable
+        return created_indexes
 
     return created_indexes
 

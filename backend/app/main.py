@@ -30,6 +30,7 @@ import app.models_db  # registra todos los modelos SQLModel
 
 from app.config import settings
 from app.db.neon import init_neon, close_neon, create_db_tables
+from app.db.mongodb import init_mongodb, close_mongodb, ensure_mongodb_indexes
 from app.services.sync_scheduler import start_scheduler, shutdown_scheduler
 
 # Imports de todos los routers desde app.routers
@@ -90,12 +91,29 @@ async def lifespan(app: FastAPI):
     else:
         logger.warning("DATABASE_URL no configurada — Neon desactivado.")
 
+    # Recomendación #7 — Inicializar MongoDB e índices automáticos si está configurado
+    if getattr(settings, "mongodb_uri", ""):
+        try:
+            init_mongodb()
+            await ensure_mongodb_indexes()
+            logger.info("MongoDB (Motor) conectado e índices asegurados.")
+        except Exception as exc:
+            logger.warning("No se pudieron asegurar índices en MongoDB al arrancar", error=str(exc))
+    else:
+        logger.info("MONGODB_URI no configurada — MongoDB desactivado.")
+
     yield
 
     logger.info("Cerrando WellQ Admin API...")
 
     # Recomendación #7 — detener APScheduler limpiamente
     shutdown_scheduler()
+
+    if getattr(settings, "mongodb_uri", ""):
+        try:
+            await close_mongodb()
+        except Exception:
+            pass
 
     if settings.database_url:
         await close_neon()

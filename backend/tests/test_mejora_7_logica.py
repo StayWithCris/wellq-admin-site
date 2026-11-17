@@ -184,7 +184,7 @@ def test_mongo_batch_lookup_soporta_listas_vacias():
 
 
 def test_patients_batch_pipeline_agrupa_por_in():
-    """Batch aggregation: PatientsMongoSource usa $in y agrupa por clinic_ids."""
+    """Batch aggregation: PatientsMongoSource usa $in y agrupa normalizando con $toString."""
     from app.services.sync_sources import PatientsMongoSource
     from bson import ObjectId
 
@@ -196,9 +196,51 @@ def test_patients_batch_pipeline_agrupa_por_in():
     assert pipeline[1] == {"$unwind": "$clinic_ids"}
     assert pipeline[2] == {"$match": {"clinic_ids": {"$in": keys}}}
     group = pipeline[3]["$group"]
-    assert group["_id"] == "$clinic_ids"
+    assert group["_id"] == {"$toString": "$clinic_ids"}
     assert "total_patients" in group
     assert "at_risk" in group
+
+
+def test_patients_apply_acumula_sin_pisar_con_tipos_mixtos():
+    """Si una clínica tiene docs con ObjectId y con str, acumula métricas (+=) sin pisar."""
+    from app.models_db import PatientHealthSummary
+    from app.services.sync_sources import PatientsMongoSource
+
+    source = PatientsMongoSource()
+    row = PatientHealthSummary(clinic_id="cl-1")
+
+    # Grupo 1: 100 pacientes (guardados con ObjectId)
+    doc_objectid = {"total_patients": 100, "at_risk": 20, "declining": 10, "stable": 60, "improving": 10}
+    source.apply(row, doc_objectid, accumulate=False)
+    assert row.total_patients == 100
+
+    # Grupo 2: 2 pacientes (guardados como string en colección antigua)
+    doc_str = {"total_patients": 2, "at_risk": 1, "declining": 0, "stable": 1, "improving": 0}
+    source.apply(row, doc_str, accumulate=True)
+
+    # Verifica que sumó 102 en vez de pisar con 2
+    assert row.total_patients == 102
+    assert row.at_risk == 21
+    assert row.stable == 61
+
+
+def test_try_acquire_sync_xact_lock_dialect_check():
+    """Verifica que dialectos distintos de PostgreSQL retornan True sin ejecutar SQL de Postgres."""
+    import asyncio
+    from app.services.sync_service import try_acquire_sync_xact_lock
+
+    class FakeDialect:
+        name = "sqlite"
+
+    class FakeEngine:
+        dialect = FakeDialect()
+
+    class FakeSQLiteSession:
+        def get_bind(self):
+            return FakeEngine()
+
+    session = FakeSQLiteSession()
+    assert asyncio.run(try_acquire_sync_xact_lock(session)) is True
 
 
 def test_clinicians_batch_pipeline_agrupa_por_in():

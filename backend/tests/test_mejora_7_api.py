@@ -345,3 +345,35 @@ def test_mongo_batch_ejecuta_un_solo_aggregate_con_multiples_clinicas(
     assert mongo.calls == ["patients", "clinicians"]
 
 
+def test_mongo_batch_acumula_tipos_mixtos_sin_pisar(
+    client, fake_db, auth_header, monkeypatch
+):
+    """Verifica que si llegan docs con ObjectId y string para la misma clínica, se acumulan sin pisarse."""
+    from bson import ObjectId
+
+    clinic = Clinic(clinic_id="cl-1", name="Clínica Uno", mongo_clinic_id="507f1f77bcf86cd799439011")
+    fake_db.data[Clinic] = [clinic]
+
+    mongo = _FakeMongo({
+        "patients": [
+            {"_id": "507f1f77bcf86cd799439011", "total_patients": 100, "at_risk": 20, "declining": 10, "stable": 60, "improving": 10},
+            {"_id": ObjectId("507f1f77bcf86cd799439011"), "total_patients": 2, "at_risk": 1, "declining": 0, "stable": 1, "improving": 0},
+        ],
+        "clinicians": [
+            {"_id": "cl-1", "total_clinicians": 5, "active_clinicians": 4, "specialties": ["Kinesiología"]},
+        ],
+    })
+    monkeypatch.setattr(sync_sources, "get_mongo_db_or_none", lambda: mongo)
+
+    r = client.post("/api/sync/run", headers=auth_header)
+    assert r.status_code == 200, r.text
+
+    summaries = [o for o in fake_db.added if isinstance(o, PatientHealthSummary) and o.clinic_id == "cl-1"]
+    assert len(summaries) == 1
+    # Verifica que acumuló 100 + 2 = 102 en vez de pisar con 2
+    assert summaries[0].total_patients == 102
+    assert summaries[0].at_risk == 21
+    assert summaries[0].stable == 61
+
+
+

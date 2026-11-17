@@ -83,20 +83,25 @@ async def try_acquire_sync_xact_lock(db: AsyncSession) -> bool:
     e inmediata al ejecutar commit() o rollback(), haciéndolo 100% seguro con
     PgBouncer / Neon connection pooling.
     """
-    # En entorno de pruebas con FakeSession no hay motor PostgreSQL real
     if db.__class__.__name__ == "FakeSession":
         return True
 
-    try:
-        from sqlalchemy import text
-        res = await db.execute(text(f"SELECT pg_try_advisory_xact_lock({SYNC_ADVISORY_LOCK_ID})"))
-        row = res.first()
-        if row is None:
-            return True
-        return bool(row[0])
-    except Exception:
-        # En SQLite u otros motores sin advisory lock, continuar de forma segura
-        return True
+    if hasattr(db, "get_bind"):
+        try:
+            bind = db.get_bind()
+            if bind is not None and getattr(bind, "dialect", None) is not None:
+                if bind.dialect.name != "postgresql":
+                    return True
+        except Exception:
+            pass
+
+    from sqlalchemy import text
+    res = await db.execute(
+        text("SELECT pg_try_advisory_xact_lock(:lock_id)"),
+        {"lock_id": SYNC_ADVISORY_LOCK_ID},
+    )
+    row = res.first()
+    return bool(row[0]) if row is not None else False
 
 
 async def try_acquire_sync_lock(db: AsyncSession) -> bool:
