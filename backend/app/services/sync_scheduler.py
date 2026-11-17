@@ -32,39 +32,27 @@ INITIAL_DELAY_SECONDS = 60
 async def _check_and_run() -> None:
     """Callback del job: evalúa si toca sincronizar y ejecuta si corresponde.
 
-    Usa pg_try_advisory_lock para que con múltiples workers (--workers 4)
-    o réplicas de Cloud Run, solo un worker adquiera el lock y evalúe la corrida.
+    Usa pg_try_advisory_xact_lock dentro de perform_sync para que con múltiples workers
+    (--workers 4) o réplicas de Cloud Run, solo un worker adquiera el lock en la transacción
+    inicial y ejecute la corrida.
     """
     try:
         async with get_session_factory()() as session:
-            # 1. Lock consultivo distribuido en PostgreSQL: evita que 4 workers corran en paralelo
-            if not await svc.try_acquire_sync_lock(session):
-                logger.debug("Scheduler: otro worker tiene el lock de sincronización")
+            # 1. Leer la configuración desde PostgreSQL (fuente única de verdad compartida)
+            config = await svc.load_config(session)
+            last_run = svc.parse_iso(config.get("last_run_at"))
+
+            if not svc.is_due(
+                last_run,
+                config["frequency_hours"],
+                has_config=config.get("configured", False),
+            ):
+                logger.debug("Sincronización programada: aún no corresponde")
                 return
 
             try:
-                # 2. Leer la configuración desde PostgreSQL (fuente única de verdad compartida)
-                config = await svc.load_config(session)
-                last_run = svc.parse_iso(config.get("last_run_at"))
-
-                if not svc.is_due(
-                    last_run,
-                    config["frequency_hours"],
-                    has_config=config.get("configured", False),
-                ):
-                    logger.debug("Sincronización programada: aún no corresponde")
-                    return
-
-                active = await svc.find_active_run(session)
-                if active is not None:
-                    logger.warning(
-                        "Sincronización programada omitida: ya hay una en curso",
-                        run_id=active.run_id,
-                    )
-                    return
-
                 run = await svc.perform_sync(
-                    session, trigger="scheduled", created_by="scheduler", with_lock=False
+                    session, trigger="scheduled", created_by="scheduler", with_lock=True
                 )
                 logger.info(
                     "Sincronización programada terminada",
@@ -72,8 +60,9 @@ async def _check_and_run() -> None:
                     status=run.status,
                     frequency_hours=run.frequency_hours,
                 )
-            finally:
-                await svc.release_sync_lock(session)
+            except svc.SyncConflictError as exc:
+                logger.debug("Sincronización programada omitida por conflicto", reason=str(exc))
+                return
     except Exception as exc:  # pragma: no cover - depende de la BD real
         logger.warning("Falló la sincronización programada", error=str(exc))
 

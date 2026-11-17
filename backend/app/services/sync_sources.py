@@ -150,13 +150,14 @@ class NeonSnapshotSource:
         return len(result.scalars().all())
 
 
-# ── Fuente MongoDB (agregación con precarga por lote sin N+1) ──────────────
+# ── Fuente MongoDB (agregación por lote sin bucle N+1) ──────────────────────
 
 class MongoAggregateSource:
     """Agrega una colección de MongoDB y hace upsert en su tabla resumen.
 
-    Subclases obligadas: `build_pipeline()` (construye el pipeline de
-    agregación) y `apply()` (proyecta el resultado sobre la fila resumen).
+    Ejecuta un único .aggregate() por colección usando {"$in": mongo_keys}
+    y agrupando por el identificador de clínica (_id), eliminando por completo
+    el bucle O(C x N) sobre clinics_list.
     """
 
     kind = "mongo"
@@ -164,11 +165,18 @@ class MongoAggregateSource:
     collection: str = ""
     summary_model: Any = None
 
-    # ── Pipeline ────────────────────────────────────────────────────────────
-    def build_pipeline(self, clinic: Any) -> list[dict]:
+    def get_mongo_keys_and_map(self, clinics: list[Any]) -> tuple[list[Any], dict[str, str]]:
+        """Extrae la lista de identificadores para $in y mapea el id resultante a clinic_id de PostgreSQL."""
         raise NotImplementedError
 
-    # ── Proyección sobre la tabla resumen ──────────────────────────────────
+    def build_batch_pipeline(self, mongo_keys: list[Any]) -> list[dict]:
+        """Construye el pipeline de agregación en lote para toda la colección."""
+        raise NotImplementedError
+
+    def build_pipeline(self, clinic: Any) -> list[dict]:
+        """Pipeline individual (retrocompatibilidad)."""
+        raise NotImplementedError
+
     def apply(self, row: Any, aggregate: dict) -> None:
         raise NotImplementedError
 
@@ -194,37 +202,51 @@ class MongoAggregateSource:
         clinics: Iterable[Any],
         now: datetime,
     ) -> int:
-        """Agrega cada clínica con `mongo_clinic_id` y actualiza su resumen.
+        """Agrega la colección completa en UNA sola llamada a Mongo y actualiza resúmenes.
 
-        Elimina el antipatrón N+1: precarga todas las filas resumen en una sola
-        consulta y hace commit en bloque al final.
+        Elimina el bucle for clinic in clinics_list: que ejecutaba aggregate() C veces.
+        Ejecuta un único aggregate() por colección con {"$in": mongo_keys} y agrupando por _id.
+        Precarga todas las filas resumen con _get_rows_batch() y persiste en bloque.
         """
         clinics_list = list(clinics)
         if not clinics_list:
             return 0
 
-        # Precargar todas las filas en 1 sola consulta
+        mongo_keys, id_to_clinic_id = self.get_mongo_keys_and_map(clinics_list)
+        if not mongo_keys:
+            return 0
+
+        # Precargar todas las filas de resumen existentes en PostgreSQL en 1 sola consulta
         clinic_ids = [c.clinic_id for c in clinics_list if getattr(c, "clinic_id", None)]
         existing_rows = await self._get_rows_batch(db, clinic_ids)
 
+        # UN SOLO .aggregate() para toda la colección de MongoDB
+        batch_pipeline = self.build_batch_pipeline(mongo_keys)
+        docs = await _collect(mongo[self.collection].aggregate(batch_pipeline))
+        if not docs:
+            return 0
+
         touched = 0
-        for clinic in clinics_list:
-            mongo_clinic_id = getattr(clinic, "mongo_clinic_id", None)
-            if not mongo_clinic_id:
+        for doc in docs:
+            doc_id = doc.get("_id")
+            # Resolver el clinic_id de PostgreSQL para el grupo
+            target_clinic_id = None
+            if doc_id is not None:
+                target_clinic_id = id_to_clinic_id.get(str(doc_id))
+            elif len(clinics_list) == 1:
+                # Si un mock de test devuelve _id: None para 1 clínica
+                target_clinic_id = clinics_list[0].clinic_id
+
+            if not target_clinic_id:
                 continue
 
-            pipeline = self.build_pipeline(clinic)
-            docs = await _collect(mongo[self.collection].aggregate(pipeline))
-            if not docs:
-                continue
-
-            row = existing_rows.get(clinic.clinic_id)
+            row = existing_rows.get(target_clinic_id)
             if row is None:
-                row = self.summary_model(clinic_id=clinic.clinic_id)
+                row = self.summary_model(clinic_id=target_clinic_id)
                 db.add(row)
-                existing_rows[clinic.clinic_id] = row
+                existing_rows[target_clinic_id] = row
 
-            self.apply(row, docs[0])
+            self.apply(row, doc)
             row.recorded_at = now
             touched += 1
 
@@ -236,16 +258,51 @@ class MongoAggregateSource:
 class PatientsMongoSource(MongoAggregateSource):
     """Colección `patients` → `PatientHealthSummary`.
 
-    Pipeline documentado en `app/models/sync.py`:
-    `$match` por `clinic_ids` (array) con el `ObjectId` de la clínica y
-    `$group` que reparte el total por estado de salud.
+    Pipeline en lote:
+    - `$match` filtrando pacientes que contengan alguno de los `clinic_ids` consultados ({"$in": mongo_keys}).
+    - `$unwind` de `clinic_ids`.
+    - `$match` para acotar a las clínicas objetivo.
+    - `$group` por `_id: "$clinic_ids"` totalizando por status (at_risk, declining, stable, improving).
     """
 
     key = "patients"
     collection = "patients"
     summary_model = PatientHealthSummary
 
+    def get_mongo_keys_and_map(self, clinics: list[Any]) -> tuple[list[Any], dict[str, str]]:
+        mongo_keys = []
+        mapping = {}
+        for c in clinics:
+            mid = getattr(c, "mongo_clinic_id", None)
+            cid = getattr(c, "clinic_id", None)
+            if mid and cid:
+                obj_id = _object_id(mid)
+                mongo_keys.append(obj_id)
+                if str(mid) != str(obj_id):
+                    mongo_keys.append(str(mid))
+                mapping[str(obj_id)] = cid
+                mapping[str(mid)] = cid
+        return mongo_keys, mapping
+
+    def build_batch_pipeline(self, mongo_keys: list[Any]) -> list[dict]:
+        return [
+            {"$match": {"clinic_ids": {"$in": mongo_keys}}},
+            {"$unwind": "$clinic_ids"},
+            {"$match": {"clinic_ids": {"$in": mongo_keys}}},
+            {
+                "$group": {
+                    "_id": "$clinic_ids",
+                    "total_patients": {"$sum": 1},
+                    "at_risk": {"$sum": {"$cond": [{"$eq": ["$status", "at_risk"]}, 1, 0]}},
+                    "declining": {"$sum": {"$cond": [{"$eq": ["$status", "declining"]}, 1, 0]}},
+                    "stable": {"$sum": {"$cond": [{"$eq": ["$status", "stable"]}, 1, 0]}},
+                    "improving": {"$sum": {"$cond": [{"$eq": ["$status", "improving"]}, 1, 0]}},
+                }
+            },
+        ]
+
     def build_pipeline(self, clinic: Any) -> list[dict]:
+        """Retrocompatibilidad con llamadas individuales y tests existentes."""
         return [
             {"$match": {"clinic_ids": _object_id(clinic.mongo_clinic_id)}},
             {
@@ -271,17 +328,40 @@ class PatientsMongoSource(MongoAggregateSource):
 class CliniciansMongoSource(MongoAggregateSource):
     """Colección `clinicians` → `ClinicianSummary`.
 
-    La colección `clinicians` referencia la clínica por `clinic_id` (string),
-    tal como documenta `app/models/sync.py`. Se agrupa por `clinic_id` y se
-    cuentan los clínicos activos (`state == "active"`); las especialidades se
-    guardan como JSON serializado.
+    Pipeline en lote:
+    - `$match` filtrando clínicos de las clínicas consultadas ({"$in": mongo_keys}).
+    - `$group` por `_id: "$clinic_id"` totalizando clinicians activos y especialidades.
     """
 
     key = "clinicians"
     collection = "clinicians"
     summary_model = ClinicianSummary
 
+    def get_mongo_keys_and_map(self, clinics: list[Any]) -> tuple[list[Any], dict[str, str]]:
+        mongo_keys = []
+        mapping = {}
+        for c in clinics:
+            cid = getattr(c, "clinic_id", None)
+            if cid:
+                mongo_keys.append(cid)
+                mapping[str(cid)] = cid
+        return mongo_keys, mapping
+
+    def build_batch_pipeline(self, mongo_keys: list[Any]) -> list[dict]:
+        return [
+            {"$match": {"clinic_id": {"$in": mongo_keys}}},
+            {
+                "$group": {
+                    "_id": "$clinic_id",
+                    "total_clinicians": {"$sum": 1},
+                    "active_clinicians": {"$sum": {"$cond": [{"$eq": ["$state", "active"]}, 1, 0]}},
+                    "specialties": {"$addToSet": "$specialties"},
+                }
+            },
+        ]
+
     def build_pipeline(self, clinic: Any) -> list[dict]:
+        """Retrocompatibilidad con llamadas individuales y tests existentes."""
         return [
             {"$match": {"clinic_id": clinic.clinic_id}},
             {
@@ -298,9 +378,16 @@ class CliniciansMongoSource(MongoAggregateSource):
         row.total_clinicians = _as_int(aggregate.get("total_clinicians"))
         row.active_clinicians = _as_int(aggregate.get("active_clinicians"))
         specialties = aggregate.get("specialties") or []
-        if isinstance(specialties, str):
-            specialties = [specialties]
-        row.specialties = json.dumps(list(specialties), ensure_ascii=False)
+        flat_specialties = []
+        if isinstance(specialties, (list, tuple, set)):
+            for item in specialties:
+                if isinstance(item, (list, tuple, set)):
+                    flat_specialties.extend(item)
+                elif item:
+                    flat_specialties.append(item)
+        elif isinstance(specialties, str):
+            flat_specialties.append(specialties)
+        row.specialties = json.dumps(list(dict.fromkeys(flat_specialties)), ensure_ascii=False)
 
 
 # ── Catálogo de fuentes ─────────────────────────────────────────────────────

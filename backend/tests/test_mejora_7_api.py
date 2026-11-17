@@ -310,3 +310,38 @@ def test_alerta_cascada_simultanea_no_dispara_falsa_alarma(client, fake_db):
     assert data["failure_alert"]["alert_active"] is False
     assert data["failure_alert"]["consecutive_failures"] == 1
 
+
+def test_mongo_batch_ejecuta_un_solo_aggregate_con_multiples_clinicas(
+    client, fake_db, auth_header, monkeypatch
+):
+    """Verifica que con 3 clínicas, MongoAggregateSource solo llama aggregate() 1 vez por colección."""
+    c1 = Clinic(clinic_id="cl-1", name="Clínica Uno", mongo_clinic_id="507f1f77bcf86cd799439011")
+    c2 = Clinic(clinic_id="cl-2", name="Clínica Dos", mongo_clinic_id="507f1f77bcf86cd799439012")
+    c3 = Clinic(clinic_id="cl-3", name="Clínica Tres", mongo_clinic_id="507f1f77bcf86cd799439013")
+    fake_db.data[Clinic] = [c1, c2, c3]
+
+    mongo = _FakeMongo({
+        "patients": [
+            {"_id": "507f1f77bcf86cd799439011", "total_patients": 5, "at_risk": 1, "declining": 1, "stable": 2, "improving": 1},
+            {"_id": "507f1f77bcf86cd799439012", "total_patients": 8, "at_risk": 2, "declining": 1, "stable": 3, "improving": 2},
+            {"_id": "507f1f77bcf86cd799439013", "total_patients": 12, "at_risk": 3, "declining": 2, "stable": 4, "improving": 3},
+        ],
+        "clinicians": [
+            {"_id": "cl-1", "total_clinicians": 2, "active_clinicians": 2, "specialties": ["Kinesio"]},
+            {"_id": "cl-2", "total_clinicians": 4, "active_clinicians": 3, "specialties": ["Nutrición"]},
+            {"_id": "cl-3", "total_clinicians": 6, "active_clinicians": 5, "specialties": ["Medicina"]},
+        ],
+    })
+    monkeypatch.setattr(sync_sources, "get_mongo_db_or_none", lambda: mongo)
+
+    r = client.post("/api/sync/run", headers=auth_header)
+    assert r.status_code == 200, r.text
+    run = r.json()["data"]
+    assert run["status"] == "completed"
+    assert run["entities"]["patients"] == 3
+    assert run["entities"]["clinicians"] == 3
+
+    # CRÍTICO: Exactamente 2 llamadas a Mongo en total (1 a patients, 1 a clinicians), NO 6
+    assert mongo.calls == ["patients", "clinicians"]
+
+

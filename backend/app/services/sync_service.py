@@ -65,15 +65,23 @@ STALE_RUN_MINUTES = 5
 # Umbral de fallos consecutivos para disparar alerta proactiva.
 CONSECUTIVE_FAILURE_THRESHOLD = 3
 
-# ID numérico para pg_try_advisory_lock en PostgreSQL
+class SyncConflictError(Exception):
+    """Lanzada cuando ya hay una sincronización activa o el lock transaccional no pudo adquirirse."""
+    pass
+
+
+# ID numérico para pg_try_advisory_xact_lock en PostgreSQL
 SYNC_ADVISORY_LOCK_ID = 84729103
 
 
-async def try_acquire_sync_lock(db: AsyncSession) -> bool:
-    """Intenta adquirir el lock consultivo a nivel de PostgreSQL (pg_try_advisory_lock).
+async def try_acquire_sync_xact_lock(db: AsyncSession) -> bool:
+    """Intenta adquirir el lock consultivo a nivel de transacción (pg_try_advisory_xact_lock).
 
     Garantiza exclusión mutua entre los 4 workers de Uvicorn y múltiples
-    réplicas de Cloud Run, impidiendo carreras a nivel de base de datos.
+    réplicas de Cloud Run durante la transacción inicial.
+    Al ser a nivel de transacción (xact), PostgreSQL lo libera de forma automática
+    e inmediata al ejecutar commit() o rollback(), haciéndolo 100% seguro con
+    PgBouncer / Neon connection pooling.
     """
     # En entorno de pruebas con FakeSession no hay motor PostgreSQL real
     if db.__class__.__name__ == "FakeSession":
@@ -81,7 +89,7 @@ async def try_acquire_sync_lock(db: AsyncSession) -> bool:
 
     try:
         from sqlalchemy import text
-        res = await db.execute(text(f"SELECT pg_try_advisory_lock({SYNC_ADVISORY_LOCK_ID})"))
+        res = await db.execute(text(f"SELECT pg_try_advisory_xact_lock({SYNC_ADVISORY_LOCK_ID})"))
         row = res.first()
         if row is None:
             return True
@@ -91,13 +99,14 @@ async def try_acquire_sync_lock(db: AsyncSession) -> bool:
         return True
 
 
+async def try_acquire_sync_lock(db: AsyncSession) -> bool:
+    """Alias retrocompatible para try_acquire_sync_xact_lock."""
+    return await try_acquire_sync_xact_lock(db)
+
+
 async def release_sync_lock(db: AsyncSession) -> None:
-    """Libera el lock consultivo en PostgreSQL."""
-    try:
-        from sqlalchemy import text
-        await db.execute(text(f"SELECT pg_advisory_unlock({SYNC_ADVISORY_LOCK_ID})"))
-    except Exception:
-        pass
+    """No-op: los locks transaccionales se liberan automáticamente en commit/rollback."""
+    pass
 
 # `SOURCE_SPECS` (tabla y columna de frescura de cada fuente) vive en
 # `app/services/sync_sources.py`: es la definición canónica que comparten el
@@ -313,12 +322,15 @@ async def get_history(db: AsyncSession, limit: int = 10) -> list[dict]:
     return [serialize_run(run) for run in result.scalars().all()]
 
 
-async def find_active_run(db: AsyncSession, stale_minutes: Optional[int] = None) -> Optional[SyncRun]:
+async def find_active_run(
+    db: AsyncSession,
+    stale_minutes: Optional[int] = None,
+    auto_commit: bool = True,
+) -> Optional[SyncRun]:
     """Devuelve la ejecución en curso y cierra las huérfanas.
 
     Se apoya en la tabla `sync_runs` (no en memoria), así que funciona igual
-    para el proceso web y para el scheduler. No hay bloqueo distribuido: con
-    más de una instancia del backend la ventana de carrera sigue existiendo.
+    para el proceso web y para el scheduler.
     """
     minutes = stale_minutes if stale_minutes is not None else STALE_RUN_MINUTES
     cutoff = datetime.utcnow() - timedelta(minutes=minutes)
@@ -341,7 +353,8 @@ async def find_active_run(db: AsyncSession, stale_minutes: Optional[int] = None)
             run.status = "failed"
             run.error = "ejecución huérfana"
             run.completed_at = now
-        await db.commit()
+        if auto_commit:
+            await db.commit()
 
     return active
 
@@ -355,82 +368,101 @@ async def perform_sync(
 ) -> SyncRun:
     """Ejecuta una sincronización y registra el resultado en `sync_runs`.
 
-    Estado de la ejecución: `completed` (todas las fuentes corrieron),
-    `partial` (algunas fuentes quedaron omitidas) o `failed` (alguna fuente
-    falló). Ver `app/services/sync_sources.py`.
+    Transacción inicial (atómica y aislada):
+    1. Si with_lock=True, adquiere pg_try_advisory_xact_lock. Si falla, lanza SyncConflictError.
+    2. Limpia huérfanos con find_active_run(auto_commit=False) y valida que no haya corrida activa.
+       Si hay una activa, lanza SyncConflictError.
+    3. Inserta el registro SyncRun(status="running") y hace commit() inmediato.
+       -> En PostgreSQL, el lock consultivo transaccional (xact) se libera automáticamente aquí.
+
+    Ejecución de fuentes:
+    4. NO mantiene la transacción ni el advisory lock abiertos durante la ejecución de run_sources.
+
+    Transacción final:
+    5. Actualiza SyncRun con los resultados, actualiza platform_settings y hace commit().
+    6. Verifica si se superó el umbral de fallos consecutivos y alerta si corresponde.
     """
-    locked = False
+    config = await load_config(db)
+    frequency = _normalize_frequency(frequency_hours or config["frequency_hours"])
+    started_at = datetime.utcnow()
+
+    # ── 1. Transacción inicial atómica con advisory xact lock ─────────────────
     if with_lock:
-        locked = await try_acquire_sync_lock(db)
+        locked = await try_acquire_sync_xact_lock(db)
+        if not locked:
+            raise SyncConflictError(
+                "Ya hay una sincronización en curso (bloqueo transaccional activo en otro worker)."
+            )
 
-    try:
-        config = await load_config(db)
-        frequency = _normalize_frequency(frequency_hours or config["frequency_hours"])
-        started_at = datetime.utcnow()
-
-        run = SyncRun(
-            run_id=f"sync-{uuid.uuid4().hex[:12]}",
-            trigger=trigger if trigger in ("manual", "scheduled") else "manual",
-            status="running",
-            frequency_hours=frequency,
-            entities="{}",
-            created_by=created_by,
-            started_at=started_at,
+    active = await find_active_run(db, auto_commit=False)
+    if active is not None:
+        raise SyncConflictError(
+            f"Ya hay una sincronización en curso ({active.run_id}). "
+            "Espera a que termine antes de lanzar otra."
         )
-        db.add(run)
+
+    run = SyncRun(
+        run_id=f"sync-{uuid.uuid4().hex[:12]}",
+        trigger=trigger if trigger in ("manual", "scheduled") else "manual",
+        status="running",
+        frequency_hours=frequency,
+        entities="{}",
+        created_by=created_by,
+        started_at=started_at,
+    )
+    db.add(run)
+    await db.commit()
+    # ¡La transacción inicial y el pg_try_advisory_xact_lock terminaron y se liberaron aquí!
+
+    # ── 2. Ejecución de fuentes fuera del advisory lock ───────────────────────
+    try:
+        outcome = await run_sources(db, now=started_at)
+        counts = dict(outcome.counts)
+        skipped = list(outcome.skipped)
+        errors = list(outcome.errors)
+
+        completed_at = datetime.utcnow()
+        # `entities` conserva las claves por fuente y agrega `skipped`.
+        run.entities = json.dumps({**counts, "skipped": skipped}, ensure_ascii=False)
+        run.completed_at = completed_at
+
+        if errors:
+            run.status = "failed"
+            run.error = "; ".join(errors)[:2000]
+        elif skipped:
+            # La ejecución sirvió, pero no todas las fuentes corrieron
+            # (p. ej. MongoDB no está configurado).
+            run.status = "partial"
+        else:
+            run.status = "completed"
+
+        setting = await _ensure_setting(db)
+        data = _load_setting(setting)
+        data.update(
+            {
+                "frequency_hours": frequency,
+                "last_run_at": completed_at.isoformat() + "Z",
+                "last_run_id": run.run_id,
+                "last_run_status": run.status,
+            }
+        )
+        setting.setting_value = json.dumps(data, ensure_ascii=False)
+        setting.updated_at = completed_at
+        setting.updated_by = created_by or "system"
         await db.commit()
 
-        try:
-            outcome = await run_sources(db, now=started_at)
-            counts = dict(outcome.counts)
-            skipped = list(outcome.skipped)
-            errors = list(outcome.errors)
+        # Punto 4: verificar fallos consecutivos y alertar si corresponde
+        await maybe_raise_failure_alert(db, run)
 
-            completed_at = datetime.utcnow()
-            # `entities` conserva las claves por fuente y agrega `skipped`.
-            run.entities = json.dumps({**counts, "skipped": skipped}, ensure_ascii=False)
-            run.completed_at = completed_at
-
-            if errors:
-                run.status = "failed"
-                run.error = "; ".join(errors)[:2000]
-            elif skipped:
-                # La ejecución sirvió, pero no todas las fuentes corrieron
-                # (p. ej. MongoDB no está configurado).
-                run.status = "partial"
-            else:
-                run.status = "completed"
-
-            setting = await _ensure_setting(db)
-            data = _load_setting(setting)
-            data.update(
-                {
-                    "frequency_hours": frequency,
-                    "last_run_at": completed_at.isoformat() + "Z",
-                    "last_run_id": run.run_id,
-                    "last_run_status": run.status,
-                }
-            )
-            setting.setting_value = json.dumps(data, ensure_ascii=False)
-            setting.updated_at = completed_at
-            setting.updated_by = created_by or "system"
-            await db.commit()
-
-            # Punto 4: verificar fallos consecutivos y alertar si corresponde
-            await maybe_raise_failure_alert(db, run)
-
-            return run
-        except Exception as exc:  # pragma: no cover - depende de la BD real
-            await db.rollback()
-            run.status = "failed"
-            run.error = str(exc)[:2000]
-            run.completed_at = datetime.utcnow()
-            db.add(run)
-            await db.commit()
-            raise
-    finally:
-        if locked:
-            await release_sync_lock(db)
+        return run
+    except Exception as exc:  # pragma: no cover - depende de la BD real
+        await db.rollback()
+        run.status = "failed"
+        run.error = str(exc)[:2000]
+        run.completed_at = datetime.utcnow()
+        db.add(run)
+        await db.commit()
+        raise
 
 
 # ── Detección de fallos consecutivos y alertas ──────────────────────────────

@@ -100,48 +100,36 @@ async def _handle_update_config(body: SyncFrequencyIn, db: AsyncSession, user: d
 
 
 async def _handle_run_sync(db: AsyncSession, user: dict):
-    active = await svc.find_active_run(db)
-    if active is not None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                f"Ya hay una sincronización en curso ({active.run_id}). "
-                "Espera a que termine antes de lanzar otra."
-            ),
-        )
-
-    if not await svc.try_acquire_sync_lock(db):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Ya hay una sincronización en curso (bloqueo distribuido activo en otro worker).",
-        )
-
     try:
-        run = await svc.perform_sync(db, trigger="manual", created_by=_email(user), with_lock=False)
-        config = await svc.load_config(db)
-
-        await svc.record_audit(
-            db,
-            action="CREATE",
-            entity_type="sync_run",
-            entity_id=run.run_id,
-            entity_name="Sincronización manual",
-            admin_user_id=_user_id(user),
-            admin_email=_email(user),
-            changes={
-                "trigger": run.trigger,
-                "status": run.status,
-                "entities": json.loads(run.entities or "{}"),
-            },
+        run = await svc.perform_sync(db, trigger="manual", created_by=_email(user), with_lock=True)
+    except svc.SyncConflictError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
         )
 
-        return {
-            "status": "success",
-            "data": svc.serialize_run(run),
-            "next_run_at": config["next_run_at"],
-        }
-    finally:
-        await svc.release_sync_lock(db)
+    config = await svc.load_config(db)
+
+    await svc.record_audit(
+        db,
+        action="CREATE",
+        entity_type="sync_run",
+        entity_id=run.run_id,
+        entity_name="Sincronización manual",
+        admin_user_id=_user_id(user),
+        admin_email=_email(user),
+        changes={
+            "trigger": run.trigger,
+            "status": run.status,
+            "entities": json.loads(run.entities or "{}"),
+        },
+    )
+
+    return {
+        "status": "success",
+        "data": svc.serialize_run(run),
+        "next_run_at": config["next_run_at"],
+    }
 
 
 async def _handle_history(limit: int, db: AsyncSession):

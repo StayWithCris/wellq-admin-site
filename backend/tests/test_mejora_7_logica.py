@@ -183,3 +183,66 @@ def test_mongo_batch_lookup_soporta_listas_vacias():
     assert res == {}
 
 
+def test_patients_batch_pipeline_agrupa_por_in():
+    """Batch aggregation: PatientsMongoSource usa $in y agrupa por clinic_ids."""
+    from app.services.sync_sources import PatientsMongoSource
+    from bson import ObjectId
+
+    source = PatientsMongoSource()
+    keys = [ObjectId("507f1f77bcf86cd799439011"), ObjectId("507f1f77bcf86cd799439012")]
+    pipeline = source.build_batch_pipeline(keys)
+
+    assert pipeline[0] == {"$match": {"clinic_ids": {"$in": keys}}}
+    assert pipeline[1] == {"$unwind": "$clinic_ids"}
+    assert pipeline[2] == {"$match": {"clinic_ids": {"$in": keys}}}
+    group = pipeline[3]["$group"]
+    assert group["_id"] == "$clinic_ids"
+    assert "total_patients" in group
+    assert "at_risk" in group
+
+
+def test_clinicians_batch_pipeline_agrupa_por_in():
+    """Batch aggregation: CliniciansMongoSource usa $in y agrupa por clinic_id."""
+    from app.services.sync_sources import CliniciansMongoSource
+
+    source = CliniciansMongoSource()
+    keys = ["cl-1", "cl-2"]
+    pipeline = source.build_batch_pipeline(keys)
+
+    assert pipeline[0] == {"$match": {"clinic_id": {"$in": keys}}}
+    group = pipeline[1]["$group"]
+    assert group["_id"] == "$clinic_id"
+    assert "total_clinicians" in group
+    assert "active_clinicians" in group
+    assert "specialties" in group
+
+
+def test_ensure_mongodb_indexes():
+    """Verifica que ensure_mongodb_indexes define los índices compuestos requeridos."""
+    import asyncio
+    from app.db.mongodb import ensure_mongodb_indexes
+
+    class FakeCollection:
+        def __init__(self):
+            self.indexes = []
+
+        async def create_index(self, keys, **kwargs):
+            self.indexes.append((keys, kwargs))
+            return kwargs.get("name", "idx")
+
+    class FakeDB:
+        def __init__(self):
+            self.patients = FakeCollection()
+            self.clinicians = FakeCollection()
+
+        def __getitem__(self, name):
+            return getattr(self, name)
+
+    fake_db = FakeDB()
+    result = asyncio.run(ensure_mongodb_indexes(fake_db))
+    assert len(result) == 2
+    assert fake_db.patients.indexes[0][0] == [("clinic_ids", 1), ("status", 1)]
+    assert fake_db.clinicians.indexes[0][0] == [("clinic_id", 1), ("state", 1)]
+
+
+

@@ -76,6 +76,44 @@ def get_mongo_db() -> AsyncIOMotorDatabase:
     return _mongo_db
 
 
+async def ensure_mongodb_indexes(db: AsyncIOMotorDatabase | None = None) -> list[str]:
+    """Crea los índices necesarios para optimizar las consultas y agregaciones de sincronización (#7).
+
+    - patients: (clinic_ids, status) para acelerar $match en lote y $group por estado de salud.
+    - clinicians: (clinic_id, state) para acelerar $match en lote y conteo de clínicos activos.
+    """
+    target_db = db if db is not None else _mongo_db
+    if target_db is None:
+        logger.warning("No se pueden crear índices en MongoDB: base de datos no inicializada")
+        return []
+
+    created_indexes: list[str] = []
+    try:
+        # Índice compuesto para agregación por clínica y estado en patients
+        idx_patients = await target_db["patients"].create_index(
+            [("clinic_ids", 1), ("status", 1)],
+            name="idx_patients_clinic_ids_status",
+            background=True,
+        )
+        created_indexes.append(f"patients.{idx_patients}")
+        logger.info("Índice creado en colección patients", index=idx_patients)
+
+        # Índice compuesto para agregación por clínica y estado en clinicians
+        idx_clinicians = await target_db["clinicians"].create_index(
+            [("clinic_id", 1), ("state", 1)],
+            name="idx_clinicians_clinic_id_state",
+            background=True,
+        )
+        created_indexes.append(f"clinicians.{idx_clinicians}")
+        logger.info("Índice creado en colección clinicians", index=idx_clinicians)
+
+    except Exception as exc:
+        logger.error("Error al crear índices en MongoDB", error=str(exc))
+        raise
+
+    return created_indexes
+
+
 # ── Nombres de colecciones en MongoDB ─────────────────────────────────────────
 # Centralizamos los nombres de colecciones para evitar cadenas duplicadas
 # dispersas por el código.
