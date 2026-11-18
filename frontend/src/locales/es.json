@@ -814,7 +814,40 @@
     "noVersionsYet": "Sin datos de versiones aún.",
     "users": "usuarios",
     "waitingDatabase": "Esperando base de datos",
-    "liveAvg": "Promedio en vivo"
+    "liveAvg": "Promedio en vivo",
+    "incidents": {
+      "title": "Notificaciones de incidentes",
+      "subtitle": "Aviso automático por Email y Slack cuando se crea una alerta de severidad {{severity}} o superior.",
+      "refresh": "Actualizar",
+      "disabled": "Las notificaciones automáticas están desactivadas (INCIDENT_NOTIFICATIONS_ENABLED=false).",
+      "channelEmail": "Email",
+      "channelSlack": "Slack",
+      "emailHint": "SMTP del proyecto",
+      "slackHint": "Webhook entrante de Slack (SLACK_WEBHOOK_URL)",
+      "recipientsAdmins": "{{count}} admin(s) con platform.manage",
+      "recipientsFixed": "{{count}} destinatario(s) fijos",
+      "configured": "Configurado",
+      "notConfigured": "Sin configurar",
+      "sendTest": "Enviar prueba",
+      "sending": "Enviando…",
+      "testSent": "Prueba enviada por {{channel}}.",
+      "testSkipped": "{{channel}} no está configurado: no se envió la prueba.",
+      "testFailed": "No se pudo enviar la prueba por {{channel}}.",
+      "history": "Últimos envíos",
+      "noHistory": "Aún no hay envíos registrados.",
+      "statusSent": "Enviado",
+      "statusFailed": "Fallido",
+      "statusSkipped": "Omitido",
+      "testAlert": "Mensaje de prueba",
+      "triggeredBySystem": "Automático",
+      "errorLoad": "No se pudo cargar la configuración de notificaciones.",
+      "severity": {
+        "low": "baja",
+        "medium": "media",
+        "high": "alta",
+        "critical": "crítica"
+      }
+    }
   },
   "analytics": {
     "appUsage": "Uso de App por Plataforma",

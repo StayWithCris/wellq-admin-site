@@ -249,3 +249,25 @@ export const archivePlan   = (planId)       => apiFetch(`/api/plans/${planId}/ar
 export const restorePlan   = (planId)       => apiFetch(`/api/plans/${planId}/restore`, { method: 'POST' });
 /** Requiere super_admin — 403 se muestra automáticamente con Swal */
 export const deletePlan    = (planId)       => apiFetch(`/api/plans/${planId}`, { method: 'DELETE' });
+
+// ─── Notificaciones de incidentes (Mejora #19) ────────────────────────────────
+
+export const fetchIncidentNotificationConfig = () =>
+  apiFetch('/api/v1/incident-notifications/config');
+
+export const fetchIncidentDeliveries = (limit = 20) =>
+  apiFetch(`/api/v1/incident-notifications/deliveries?limit=${limit}`);
+
+/** @param {'email'|'slack'} channel */
+export const sendIncidentTest = (channel) =>
+  apiFetch('/api/v1/incident-notifications/test', {
+    method: 'POST',
+    body: JSON.stringify({ channel }),
+  });
+
+export const dispatchAlertNotification = (alertId, channels) =>
+  apiFetch(`/api/v1/incident-notifications/alerts/${encodeURIComponent(alertId)}/dispatch`, {
+    method: 'POST',
+    body: JSON.stringify(channels ? { channels } : {}),
+  });
+

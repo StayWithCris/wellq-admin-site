@@ -814,7 +814,40 @@
     "noVersionsYet": "No version data yet.",
     "users": "users",
     "waitingDatabase": "Waiting for database",
-    "liveAvg": "Live Avg"
+    "liveAvg": "Live Avg",
+    "incidents": {
+      "title": "Incident notifications",
+      "subtitle": "Automatic Email and Slack notice when an alert of {{severity}} severity or higher is created.",
+      "refresh": "Refresh",
+      "disabled": "Automatic notifications are turned off (INCIDENT_NOTIFICATIONS_ENABLED=false).",
+      "channelEmail": "Email",
+      "channelSlack": "Slack",
+      "emailHint": "Project SMTP",
+      "slackHint": "Slack incoming webhook (SLACK_WEBHOOK_URL)",
+      "recipientsAdmins": "{{count}} admin(s) with platform.manage",
+      "recipientsFixed": "{{count}} fixed recipient(s)",
+      "configured": "Configured",
+      "notConfigured": "Not configured",
+      "sendTest": "Send test",
+      "sending": "Sending…",
+      "testSent": "Test sent via {{channel}}.",
+      "testSkipped": "{{channel}} is not configured: the test was not sent.",
+      "testFailed": "Could not send the test via {{channel}}.",
+      "history": "Latest deliveries",
+      "noHistory": "No deliveries recorded yet.",
+      "statusSent": "Sent",
+      "statusFailed": "Failed",
+      "statusSkipped": "Skipped",
+      "testAlert": "Test message",
+      "triggeredBySystem": "Automatic",
+      "errorLoad": "Could not load the notification settings.",
+      "severity": {
+        "low": "low",
+        "medium": "medium",
+        "high": "high",
+        "critical": "critical"
+      }
+    }
   },
   "analytics": {
     "appUsage": "App Usage by Platform",
