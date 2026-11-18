@@ -536,6 +536,10 @@ async def maybe_raise_failure_alert(db: AsyncSession, run: SyncRun) -> bool:
     db.add(alert)
     await db.commit()
 
+    # Mejora #19 — avisar por Email y Slack (no interrumpe la sincronización)
+    from app.services.incident_notifier import notify_new_alert
+    await notify_new_alert(db, alert)
+
     # Log CRITICAL para sistemas de monitoreo externos
     logger.critical(
         "Fallos consecutivos de sincronización detectados",
