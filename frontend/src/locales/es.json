@@ -1293,5 +1293,36 @@
     "readOnlySessionStartedBy": "Sesión de solo lectura iniciada por",
     "skipToContent": "Saltar al contenido principal",
     "language": "Idioma"
+  },
+  "assistant": {
+    "open": "Abrir asistente",
+    "close": "Cerrar asistente",
+    "title": "Asistente WellQ",
+    "subtitle": "Solo lectura · responde con datos del panel",
+    "welcome": "Hola, soy el asistente de WellQ Admin. Puedo consultar clínicas, facturas, alertas, tickets y la sincronización, pero no puedo modificar nada.",
+    "placeholder": "Pregunta sobre clínicas, facturas, alertas o tickets…",
+    "send": "Enviar",
+    "stop": "Detener respuesta",
+    "clear": "Nueva conversación",
+    "thinking": "Consultando datos…",
+    "stopped": "(respuesta detenida)",
+    "error": "No se pudo obtener una respuesta. Intenta de nuevo.",
+    "disabled": "El asistente no está configurado en el servidor (falta GEMINI_API_KEY).",
+    "noTools": "Tu rol no tiene permisos para consultar datos con el asistente.",
+    "toolDenied": "sin permiso",
+    "suggestions": {
+      "overview": "Dame un resumen del panel",
+      "invoices": "¿Cuánto hay en facturas vencidas?",
+      "alerts": "¿Qué alertas críticas hay sin gestionar?",
+      "clinics": "¿Qué clínicas están en estado crítico?"
+    },
+    "tools": {
+      "resumen_panel": "Resumen del panel",
+      "listar_clinicas": "Clínicas",
+      "resumen_facturas": "Facturas",
+      "alertas_activas": "Alertas",
+      "tickets_soporte": "Tickets de soporte",
+      "estado_sincronizacion": "Sincronización"
+    }
   }
 }

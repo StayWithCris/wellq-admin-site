@@ -1293,5 +1293,36 @@
     "readOnlySessionStartedBy": "Read-only session started by",
     "skipToContent": "Skip to main content",
     "language": "Language"
+  },
+  "assistant": {
+    "open": "Open assistant",
+    "close": "Close assistant",
+    "title": "WellQ Assistant",
+    "subtitle": "Read-only · answers with panel data",
+    "welcome": "Hi, I'm the WellQ Admin assistant. I can look up clinics, invoices, alerts, tickets and data sync, but I can't change anything.",
+    "placeholder": "Ask about clinics, invoices, alerts or tickets…",
+    "send": "Send",
+    "stop": "Stop answer",
+    "clear": "New conversation",
+    "thinking": "Looking up data…",
+    "stopped": "(answer stopped)",
+    "error": "Could not get an answer. Please try again.",
+    "disabled": "The assistant is not configured on the server (GEMINI_API_KEY is missing).",
+    "noTools": "Your role has no permission to query data with the assistant.",
+    "toolDenied": "no permission",
+    "suggestions": {
+      "overview": "Give me a panel summary",
+      "invoices": "How much is in overdue invoices?",
+      "alerts": "Which critical alerts are still open?",
+      "clinics": "Which clinics are in critical status?"
+    },
+    "tools": {
+      "resumen_panel": "Panel summary",
+      "listar_clinicas": "Clinics",
+      "resumen_facturas": "Invoices",
+      "alertas_activas": "Alerts",
+      "tickets_soporte": "Support tickets",
+      "estado_sincronizacion": "Data sync"
+    }
   }
 }
