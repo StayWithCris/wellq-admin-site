@@ -814,7 +814,40 @@
     "noVersionsYet": "Sin datos de versiones aún.",
     "users": "usuarios",
     "waitingDatabase": "Esperando base de datos",
-    "liveAvg": "Promedio en vivo"
+    "liveAvg": "Promedio en vivo",
+    "incidents": {
+      "title": "Notificaciones de incidentes",
+      "subtitle": "Aviso automático por Email y Slack cuando se crea una alerta de severidad {{severity}} o superior.",
+      "refresh": "Actualizar",
+      "disabled": "Las notificaciones automáticas están desactivadas (INCIDENT_NOTIFICATIONS_ENABLED=false).",
+      "channelEmail": "Email",
+      "channelSlack": "Slack",
+      "emailHint": "SMTP del proyecto",
+      "slackHint": "Webhook entrante de Slack (SLACK_WEBHOOK_URL)",
+      "recipientsAdmins": "{{count}} admin(s) con platform.manage",
+      "recipientsFixed": "{{count}} destinatario(s) fijos",
+      "configured": "Configurado",
+      "notConfigured": "Sin configurar",
+      "sendTest": "Enviar prueba",
+      "sending": "Enviando…",
+      "testSent": "Prueba enviada por {{channel}}.",
+      "testSkipped": "{{channel}} no está configurado: no se envió la prueba.",
+      "testFailed": "No se pudo enviar la prueba por {{channel}}.",
+      "history": "Últimos envíos",
+      "noHistory": "Aún no hay envíos registrados.",
+      "statusSent": "Enviado",
+      "statusFailed": "Fallido",
+      "statusSkipped": "Omitido",
+      "testAlert": "Mensaje de prueba",
+      "triggeredBySystem": "Automático",
+      "errorLoad": "No se pudo cargar la configuración de notificaciones.",
+      "severity": {
+        "low": "baja",
+        "medium": "media",
+        "high": "alta",
+        "critical": "crítica"
+      }
+    }
   },
   "analytics": {
     "appUsage": "Uso de App por Plataforma",
@@ -1260,5 +1293,36 @@
     "readOnlySessionStartedBy": "Sesión de solo lectura iniciada por",
     "skipToContent": "Saltar al contenido principal",
     "language": "Idioma"
+  },
+  "assistant": {
+    "open": "Abrir asistente",
+    "close": "Cerrar asistente",
+    "title": "Asistente WellQ",
+    "subtitle": "Solo lectura · responde con datos del panel",
+    "welcome": "Hola, soy el asistente de WellQ Admin. Puedo consultar clínicas, facturas, alertas, tickets y la sincronización, pero no puedo modificar nada.",
+    "placeholder": "Pregunta sobre clínicas, facturas, alertas o tickets…",
+    "send": "Enviar",
+    "stop": "Detener respuesta",
+    "clear": "Nueva conversación",
+    "thinking": "Consultando datos…",
+    "stopped": "(respuesta detenida)",
+    "error": "No se pudo obtener una respuesta. Intenta de nuevo.",
+    "disabled": "El asistente no está configurado en el servidor (falta GEMINI_API_KEY).",
+    "noTools": "Tu rol no tiene permisos para consultar datos con el asistente.",
+    "toolDenied": "sin permiso",
+    "suggestions": {
+      "overview": "Dame un resumen del panel",
+      "invoices": "¿Cuánto hay en facturas vencidas?",
+      "alerts": "¿Qué alertas críticas hay sin gestionar?",
+      "clinics": "¿Qué clínicas están en estado crítico?"
+    },
+    "tools": {
+      "resumen_panel": "Resumen del panel",
+      "listar_clinicas": "Clínicas",
+      "resumen_facturas": "Facturas",
+      "alertas_activas": "Alertas",
+      "tickets_soporte": "Tickets de soporte",
+      "estado_sincronizacion": "Sincronización"
+    }
   }
 }

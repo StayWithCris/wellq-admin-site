@@ -22,6 +22,8 @@ from app.routers import ticket_routing
 from app.routers import discounts
 from app.routers import impersonation_console
 from app.routers import two_factor
+from app.routers import incident_notifications
+from app.routers import assistant
 import structlog
 import logging
 import asyncio
@@ -181,6 +183,8 @@ app.include_router(ticket_routing.router)  # Mejora #12 — /api/ticket-routing
 app.include_router(discounts.router)  # Mejora #4 — /api/discounts
 app.include_router(impersonation_console.router)  # Mejora #14 — /api/impersonation
 app.include_router(two_factor.router)  # Mejora #18 — /api/auth/2fa/*, /api/auth/sessions
+app.include_router(incident_notifications.router)  # Mejora #19 — /api/v1/incident-notifications/*
+app.include_router(assistant.router)  # Mejora #20 — /api/v1/assistant/*
 
 
 # Registro de los nuevos componentes adaptados

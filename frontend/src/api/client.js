@@ -249,3 +249,84 @@ export const archivePlan   = (planId)       => apiFetch(`/api/plans/${planId}/ar
 export const restorePlan   = (planId)       => apiFetch(`/api/plans/${planId}/restore`, { method: 'POST' });
 /** Requiere super_admin — 403 se muestra automáticamente con Swal */
 export const deletePlan    = (planId)       => apiFetch(`/api/plans/${planId}`, { method: 'DELETE' });
+
+// ─── Notificaciones de incidentes (Mejora #19) ────────────────────────────────
+
+export const fetchIncidentNotificationConfig = () =>
+  apiFetch('/api/v1/incident-notifications/config');
+
+export const fetchIncidentDeliveries = (limit = 20) =>
+  apiFetch(`/api/v1/incident-notifications/deliveries?limit=${limit}`);
+
+/** @param {'email'|'slack'} channel */
+export const sendIncidentTest = (channel) =>
+  apiFetch('/api/v1/incident-notifications/test', {
+    method: 'POST',
+    body: JSON.stringify({ channel }),
+  });
+
+export const dispatchAlertNotification = (alertId, channels) =>
+  apiFetch(`/api/v1/incident-notifications/alerts/${encodeURIComponent(alertId)}/dispatch`, {
+    method: 'POST',
+    body: JSON.stringify(channels ? { channels } : {}),
+  });
+
+// ─── Asistente conversacional (Mejora #20) ────────────────────────────────────
+
+export const fetchAssistantStatus = () => apiFetch('/api/v1/assistant/status');
+
+/**
+ * Envía una pregunta al asistente y entrega los eventos SSE a medida que llegan.
+ * Eventos: meta · tool · delta · done · error (ver backend/app/routers/assistant.py).
+ *
+ * @param {string} message
+ * @param {{role:'user'|'assistant', text:string}[]} history
+ * @param {(event:object)=>void} onEvent
+ * @param {AbortSignal} [signal]
+ */
+export const streamAssistantChat = async (message, history, onEvent, signal) => {
+  const token = getAccessToken();
+  const res = await fetch(`${API_BASE}/api/v1/assistant/chat`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'text/event-stream',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ message, history }),
+    signal,
+  });
+
+  if (!res.ok) {
+    let detail = '';
+    try {
+      detail = formatApiDetail((await res.json())?.detail);
+    } catch {
+      detail = '';
+    }
+    const err = new Error(detail || `HTTP ${res.status}`);
+    err.status = res.status;
+    throw err;
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let sep;
+    while ((sep = buffer.indexOf('\n\n')) !== -1) {
+      const block = buffer.slice(0, sep);
+      buffer = buffer.slice(sep + 2);
+      const dataLine = block.split('\n').find((line) => line.startsWith('data:'));
+      if (!dataLine) continue;
+      try {
+        onEvent(JSON.parse(dataLine.slice(5).trim()));
+      } catch {
+        /* bloque incompleto o inválido: se ignora */
+      }
+    }
+  }
+};

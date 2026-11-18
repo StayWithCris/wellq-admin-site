@@ -10,6 +10,7 @@ import { Skeleton } from '../components/ui';
 import useHasPermission from '../hooks/useHasPermission'; // ← NUEVO: hook de permisos
 import { InfraCostsPanel } from '../components/platform/InfraCostsPanel'; // Mejora #6 - costos cloud
 import { SyncPanel } from '../components/platform/SyncPanel'; // Recomendación #7 - sincronización programable
+import { IncidentNotificationsPanel } from '../components/platform/IncidentNotificationsPanel'; // Mejora #19 - notificaciones Email/Slack
 import { filterAndSortBySearch, hasSearchQuery, matchesSearch } from '../utils/search';
 
 // ─── Design Tokens para Platform Ops ───
@@ -393,8 +394,9 @@ export const PlatformOpsView = ({ apiCosts, apiLatency, apiPose, apiServers, sea
   const showInfrastructure = !searchActive || visibleServers.length > 0 || matchesSearch(searchQuery, t('platform.infrastructure'), 'server', 'infrastructure');
   const showVersions = !searchActive || matchesSearch(searchQuery, t('platform.appVersionDistribution'), t('platform.forceUpdateBtn'), t('platform.users'), 'app', 'version', 'force update');
   const showSync = !searchActive || matchesSearch(searchQuery, t('platform.sync.title'), 'sync', 'sincronización', 'sincronizacion');
+  const showIncidents = !searchActive || matchesSearch(searchQuery, t('platform.incidents.title'), 'slack', 'email', 'correo', 'incidente', 'incident', 'notificación', 'notificacion');
 
-  if (searchActive && visibleCardIds.size === 0 && !showInfrastructure && !showVersions && !showSync) {
+  if (searchActive && visibleCardIds.size === 0 && !showInfrastructure && !showVersions && !showSync && !showIncidents) {
     return <SearchEmptyState query={searchQuery} />;
   }
 
@@ -521,6 +523,13 @@ export const PlatformOpsView = ({ apiCosts, apiLatency, apiPose, apiServers, sea
       {showSync && (
         <motion.div variants={itemVariants}>
           <SyncPanel searchQuery={searchQuery} />
+        </motion.div>
+      )}
+
+      {/* ── Notificaciones de incidentes por Email y Slack (Mejora #19) ── */}
+      {showIncidents && (
+        <motion.div variants={itemVariants}>
+          <IncidentNotificationsPanel />
         </motion.div>
       )}
 

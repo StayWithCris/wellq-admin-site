@@ -2,7 +2,7 @@
 
 from app.models.organization import Clinic
 from app.models.plans import Feature, Plan, PlanCatalog, PlanFeature, ClinicPlan, ScheduledChange, Discount, ClinicDiscount
-from app.models.operations import Alert, Notification, Job, AppVersion, PlatformSetting, ForceUpdateConfig
+from app.models.operations import Alert, Notification, IncidentNotificationDelivery, Job, AppVersion, PlatformSetting, ForceUpdateConfig
 from app.models.identity import Role, Permission, RolePermission, AdminUser, PasswordResetToken, AdminSession
 from app.models.analytics import KpiSnapshot, AppMetric, Invoice, ClinicUsageMetric, MrrSnapshot, AppUsageStat, FeatureAdoption, AdherenceSnapshot, CohortRetention, SoapQualityMetric, AiCostSnapshot, AiLatencyMetric, PoseAnalysisSnapshot, NeedsAttentionItem, InfrastructureCostSnapshot
 from app.models.infrastructure import Server, BackgroundProcess, InfraNode
@@ -22,6 +22,7 @@ __all__ = [
     "ClinicDiscount",
     "Alert",
     "Notification",
+    "IncidentNotificationDelivery",
     "Job",
     "AppVersion",
     "PlatformSetting",
