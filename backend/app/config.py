@@ -58,6 +58,11 @@ class Settings(BaseSettings):
     incident_email_recipients: str = ""          # lista separada por comas (opcional)
     slack_webhook_url: str = ""
 
+    # Mejora #20 — Asistente conversacional (Google Gemini, solo lectura).
+    # Sin GEMINI_API_KEY el asistente queda desactivado.
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-2.5-flash"
+    assistant_rate_limit_per_minute: int = 20
 
     model_config = SettingsConfigDict(
         env_file=".env",
