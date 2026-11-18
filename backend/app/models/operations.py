@@ -41,6 +41,27 @@ class Notification(SQLModel, table=True):
     created_at: datetime          = Field(default_factory=datetime.utcnow)
     sent_at: Optional[datetime]   = Field(default=None)
 
+class IncidentNotificationDelivery(SQLModel, table=True):
+    """Mejora #19 — Historial de envíos de notificaciones de incidentes.
+
+    Una fila por canal (email o slack) cada vez que se notifica una alerta.
+    `alert_id` es "test" para los envíos de prueba desde el panel.
+    """
+    __tablename__ = "incident_notification_deliveries"
+
+    id: Optional[int]           = Field(default=None, primary_key=True)
+    delivery_id: str            = Field(unique=True, index=True)
+    alert_id: str               = Field(index=True)
+    alert_title: Optional[str]  = Field(default=None)
+    severity: Optional[str]     = Field(default=None)
+    channel: str                = Field(index=True)                # "email" | "slack"
+    recipients: Optional[str]   = Field(default=None, sa_column=Column(Text))
+    status: str                 = Field(default="pending")         # "sent" | "failed" | "skipped"
+    detail: Optional[str]       = Field(default=None, sa_column=Column(Text))
+    triggered_by: str           = Field(default="system")          # "system" | email del admin
+    created_at: datetime        = Field(default_factory=datetime.utcnow)
+    sent_at: Optional[datetime] = Field(default=None)
+
 class Job(SQLModel, table=True):
     __tablename__ = "jobs"
 

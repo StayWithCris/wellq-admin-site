@@ -49,6 +49,16 @@ class Settings(BaseSettings):
     mongodb_uri: str = ""
     mongodb_db_name: str = ""
 
+    # Mejora #19 — Notificaciones de incidentes por Email y Slack.
+    # Si SLACK_WEBHOOK_URL está vacía, el canal Slack queda desactivado.
+    # Si INCIDENT_EMAIL_RECIPIENTS está vacía, el correo va a los admins
+    # activos con el permiso platform.manage.
+    incident_notifications_enabled: bool = True
+    incident_min_severity: str = "high"          # low | medium | high | critical
+    incident_email_recipients: str = ""          # lista separada por comas (opcional)
+    slack_webhook_url: str = ""
+
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
