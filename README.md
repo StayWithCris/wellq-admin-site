@@ -84,7 +84,41 @@ Para backend desplegado en Google Cloud Run:
 VITE_API_URL=https://URL-DEL-BACKEND-EN-GOOGLE-CLOUD-RUN
 ```
 
-## 3. Configuracion de GitHub
+## 3. Despliegue en Google Cloud Run (Backend)
+
+Para desplegar el backend en Google Cloud Run con la topologia oficial de costo minimo y coherencia de estado en RAM:
+
+```bash
+cd backend
+# En Linux/macOS:
+chmod +x deploy_cloud_run.sh
+./deploy_cloud_run.sh
+
+# O en Windows PowerShell:
+.\deploy_cloud_run.ps1
+```
+
+O ejecutando directamente con el CLI de Google Cloud:
+
+```bash
+gcloud run deploy wellq-admin-backend \
+  --source . \
+  --platform managed \
+  --region us-central1 \
+  --allow-unauthenticated \
+  --port 8080 \
+  --max-instances 1 \
+  --min-instances 0 \
+  --cpu-throttling \
+  --timeout 300
+```
+
+> **Parametros arquitectonicos clave:**
+> - `--max-instances 1`: Mantiene una unica instancia activa para garantizar la coherencia del estado en RAM (buffer de telemetria, histograma y SSE Hub) sin requerir broker externo como Redis.
+> - `--min-instances 0`: Permite escalar a cero cuando no hay peticiones activas, eliminando costos fijos 24/7.
+> - `--cpu-throttling`: Asigna CPU exclusivamente durante la atencion de peticiones HTTP, complementandose con la pausa por inactividad (`document.visibilityState`) del frontend para ahorrar costos de infraestructura.
+
+## 4. Configuracion de GitHub
 
 Usar estos comandos cuando quieras subir cambios al repositorio.
 

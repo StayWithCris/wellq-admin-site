@@ -9,6 +9,7 @@ que en Firestore (ventana de tiempo, group by, histogramas, etc.).
 
 import asyncio
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
+from pymongo.errors import OperationFailure
 import structlog
 
 from app.config import settings
@@ -114,6 +115,100 @@ async def ensure_mongodb_indexes(db: AsyncIOMotorDatabase | None = None) -> list
         # Retornar los índices alcanzados sin romper el arranque de la app si Mongo está inalcanzable
         return created_indexes
 
+    # ── Índices de telemetría (Rec #5) ───────────────────────────────────────
+    # Evitan COLLSCAN O(N): la búsqueda B-Tree ubica el inicio del rango en O(log N).
+    # Se crean en un try/except propio para que un fallo de telemetría no
+    # impida los índices de sincronización de arriba.
+    for collection, specs in TELEMETRY_INDEXES.items():
+        for keys in specs:
+            index_name = "idx_" + "_".join(f"{campo}_{direccion}" for campo, direccion in keys)
+            try:
+                idx = await target_db[collection].create_index(
+                    list(keys),
+                    name=index_name,
+                    background=True,
+                )
+                created_indexes.append(f"{collection}.{idx}")
+                logger.info("Índice de telemetría creado", coleccion=collection, index=idx)
+            except Exception as exc:
+                logger.warning(
+                    "No se pudo asegurar el índice de telemetría",
+                    coleccion=collection,
+                    index=index_name,
+                    error=str(exc),
+                )
+
+    # ── Índice TTL exclusivo para latency_metrics (8 días = 691.200 s) ────────
+    # Higiene de BD: elimina registros viejos automáticamente para no saturar Atlas.
+    # PROHIBIDO: NO agregar TTL a pose_analysis_logs.
+    ttl_index_name = "idx_latency_metrics_created_at_ttl"
+    try:
+        latency_col = target_db[MongoCollections.LATENCY_METRICS]
+    except Exception as exc:
+        logger.warning("No se pudo acceder a la colección latency_metrics para asegurar índice TTL", error=str(exc))
+        return created_indexes
+
+    # 1) Inspección preventiva vía index_information() para identificar colisiones
+    try:
+        existing_info = await latency_col.index_information()
+    except Exception:
+        existing_info = {}
+
+    for name, spec in (existing_info or {}).items():
+        keys = spec.get("key")
+        # Claves equivalentes a [('created_at', 1)]
+        if keys in ([("created_at", 1)], [("created_at", 1.0)]):
+            existing_ttl = spec.get("expireAfterSeconds")
+            if existing_ttl != 691200 or name != ttl_index_name:
+                logger.warning(
+                    "Detectado índice conflictivo sobre created_at en latency_metrics, eliminando para asegurar TTL",
+                    index_name=name,
+                    existing_ttl=existing_ttl,
+                )
+                await latency_col.drop_index(name)
+
+    # 2) Creación resiliente con captura selectiva de códigos 85 y 86 (IndexOptionsConflict / IndexKeySpecsConflict)
+    try:
+        idx_ttl = await latency_col.create_index(
+            [("created_at", 1)],
+            name=ttl_index_name,
+            expireAfterSeconds=691200,
+            background=True,
+        )
+        created_indexes.append(f"{MongoCollections.LATENCY_METRICS}.{idx_ttl}")
+        logger.info("Índice TTL asegurado en latency_metrics", index=idx_ttl, expireAfterSeconds=691200)
+    except OperationFailure as exc:
+        if exc.code in (85, 86):
+            logger.warning(
+                "Conflicto de opciones o especificación de índice (código 85/86 de MongoDB), resolviendo colisión",
+                code=exc.code,
+                error=str(exc),
+            )
+            # Reintentar identificando y eliminando cualquier índice previo en created_at
+            try:
+                refreshed_info = await latency_col.index_information()
+                for name, spec in (refreshed_info or {}).items():
+                    if spec.get("key") in ([("created_at", 1)], [("created_at", 1.0)]):
+                        await latency_col.drop_index(name)
+            except Exception:
+                for fallback_name in (ttl_index_name, "created_at_1"):
+                    try:
+                        await latency_col.drop_index(fallback_name)
+                    except Exception:
+                        pass
+
+            idx_ttl = await latency_col.create_index(
+                [("created_at", 1)],
+                name=ttl_index_name,
+                expireAfterSeconds=691200,
+                background=True,
+            )
+            created_indexes.append(f"{MongoCollections.LATENCY_METRICS}.{idx_ttl}")
+            logger.info("Índice TTL recreado exitosamente tras resolver conflicto 85/86", index=idx_ttl)
+        else:
+            logger.error("Fallo inesperado creando índice TTL en latency_metrics", code=exc.code, error=str(exc))
+            raise
+
     return created_indexes
 
 
@@ -130,3 +225,26 @@ class MongoCollections:
     COST_METRICS = "cost_metrics"             # Costos de infraestructura y modelos de IA
     APP_VERSIONS = "app_version_distribution" # Distribución de versiones de la app por clínica
     PRODUCT_EVENTS = "product_events"         # Eventos de analítica de producto (clicks, funnels)
+
+
+# ── Índices compuestos de telemetría (Rec #5) ─────────────────────────────────
+# Se crean DENTRO de `ensure_mongodb_indexes()` (el mismo mecanismo que usa la
+# Recomendación #7) — no hay un segundo mecanismo de creación de índices.
+#
+# `latency_metrics`  → se consulta por ventana temporal (created_at) y a
+#                       veces por endpoint o clínica.
+# `pose_analysis_logs` → el feed en vivo y `/logs` los leen por clínica y fecha.
+#
+# NOTA: patients/clinicians se referencian como strings crudos en
+# sync_sources.py (no tienen constantes en MongoCollections) — para #5 se usan
+# las constantes existentes LATENCY_METRICS y POSE_ANALYSIS.
+TELEMETRY_INDEXES: dict[str, list[tuple[tuple[str, int], ...]]] = {
+    MongoCollections.LATENCY_METRICS: [
+        (("created_at", -1), ("endpoint", 1)),
+        (("clinic_id", 1), ("created_at", -1)),
+    ],
+    MongoCollections.POSE_ANALYSIS: [
+        (("clinic_id", 1), ("created_at", -1)),
+        (("created_at", -1),),
+    ],
+}

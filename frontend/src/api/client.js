@@ -1,5 +1,6 @@
 import Swal from 'sweetalert2';
 import { getAccessToken, clearTokens } from '../services/auth';
+import { SSEDecoder } from './sseParser.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // client.js — HTTP client centralizado para WellQ Admin
@@ -270,6 +271,151 @@ export const dispatchAlertNotification = (alertId, channels) =>
     method: 'POST',
     body: JSON.stringify(channels ? { channels } : {}),
   });
+
+// ─── Telemetría y registros reales (Rec #5) ─────────────────────────────────
+
+/**
+ * Métricas agregadas de la API (P50/P90/P99, tasa de error, RPM, serie).
+ * @param {{ window?: '1h'|'24h'|'7d', endpoint?: string, clinic_id?: string }} params
+ */
+export const fetchTelemetryMetrics = (params = {}) => {
+  const qs = new URLSearchParams(
+    Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== ''))
+  ).toString();
+  return apiFetch(`/api/platform/telemetry/metrics${qs ? `?${qs}` : ''}`);
+};
+
+/**
+ * Eventos recientes de análisis de postura.
+ * @param {{ window?: '1h'|'24h'|'7d', clinic_id?: string, limit?: number }} params
+ */
+export const fetchTelemetryLogs = (params = {}) => {
+  const qs = new URLSearchParams(
+    Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== ''))
+  ).toString();
+  return apiFetch(`/api/platform/telemetry/logs${qs ? `?${qs}` : ''}`);
+};
+
+/**
+ * Abre el stream SSE de telemetría mediante fetch() y ReadableStream.
+ *
+ * SEGURIDAD (OWASP): el JWT viaja en el header estándar Authorization: Bearer,
+ * NUNCA en la URL ni query params (?token=).
+ *
+ * Maneja reconexión controlada con backoff exponencial y jitter (1s..30s).
+ * Detiene la reconexión inmediatamente si el servidor responde 401 o 403.
+ *
+ * @param {{ clinicId?: string, endpoint?: string, onLog?: Function,
+ *           onMetrics?: Function, onOpen?: Function, onError?: Function }} handlers
+ * @returns {() => void} close() — cierra el stream y cancela reintentos.
+ */
+export const streamTelemetryEvents = ({ clinicId, endpoint, onLog, onMetrics, onOpen, onError } = {}) => {
+  const qs = new URLSearchParams();
+  if (clinicId) qs.set('clinic_id', clinicId);
+  if (endpoint) qs.set('endpoint', endpoint);
+
+  let controller = new AbortController();
+  let stopped = false;
+  let isConnecting = false;
+  let retryCount = 0;
+  let retryTimer = null;
+
+  const connect = async () => {
+    if (stopped || isConnecting) return;
+    isConnecting = true;
+    controller = new AbortController();
+    const token = getAccessToken();
+
+    try {
+      const res = await fetch(`${API_BASE}/api/platform/telemetry/stream${qs.toString() ? `?${qs.toString()}` : ''}`, {
+        method: 'GET',
+        headers: {
+          Accept: 'text/event-stream',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        let detail = '';
+        try {
+          detail = formatApiDetail((await res.json())?.detail);
+        } catch {
+          detail = '';
+        }
+        const err = new Error(detail || `HTTP ${res.status}`);
+        err.status = res.status;
+        isConnecting = false;
+
+        // Si es 401 o 403: NO hacer loops de reintento con tokens vencidos o sin permisos
+        if (res.status === 401 || res.status === 403) {
+          stopped = true;
+          if (retryTimer) {
+            clearTimeout(retryTimer);
+            retryTimer = null;
+          }
+          onError?.(err);
+          return;
+        }
+        throw err;
+      }
+
+      isConnecting = false;
+      retryCount = 0;
+      onOpen?.();
+
+      const reader = res.body.getReader();
+      const sseDecoder = new SSEDecoder();
+
+      for (;;) {
+        const { value, done } = await reader.read();
+        const events = sseDecoder.push(value, done);
+
+        for (const ev of events) {
+          if (ev.event === 'log') {
+            onLog?.(ev.data);
+          } else if (ev.event === 'metrics') {
+            onMetrics?.(ev.data);
+          }
+        }
+
+        if (done) break;
+      }
+
+      // Si el stream se cierra normalmente (ej. timeout de Cloud Run), reconectar
+      if (!stopped) {
+        scheduleReconnect();
+      }
+    } catch (err) {
+      isConnecting = false;
+      if (err.name === 'AbortError' || stopped) return;
+      onError?.(err);
+      scheduleReconnect();
+    }
+  };
+
+  const scheduleReconnect = () => {
+    if (stopped) return;
+    // Backoff exponencial con jitter: 1s, 2s, 4s, 8s, máx 30s
+    const baseDelay = Math.min(30000, 1000 * Math.pow(2, retryCount));
+    const jitter = Math.random() * 500;
+    const delay = baseDelay + jitter;
+    retryCount++;
+    if (retryTimer) clearTimeout(retryTimer);
+    retryTimer = setTimeout(connect, delay);
+  };
+
+  connect();
+
+  return () => {
+    stopped = true;
+    if (retryTimer) {
+      clearTimeout(retryTimer);
+      retryTimer = null;
+    }
+    controller.abort();
+  };
+};
 
 // ─── Asistente conversacional (Mejora #20) ────────────────────────────────────
 

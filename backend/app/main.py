@@ -24,6 +24,7 @@ from app.routers import impersonation_console
 from app.routers import two_factor
 from app.routers import incident_notifications
 from app.routers import assistant
+from app.routers import telemetry            # Recomendación #5 — Telemetría y registros reales
 import structlog
 import logging
 import asyncio
@@ -34,6 +35,8 @@ from app.config import settings
 from app.db.neon import init_neon, close_neon, create_db_tables
 from app.db.mongodb import init_mongodb, close_mongodb, ensure_mongodb_indexes
 from app.services.sync_scheduler import start_scheduler, shutdown_scheduler
+from app.services import telemetry_service as telemetry_service  # Recomendación #5
+from app.middleware.telemetry import telemetry_middleware       # Recomendación #5
 
 # Imports de todos los routers desde app.routers
 from app.routers import (
@@ -84,6 +87,7 @@ async def lifespan(app: FastAPI):
     logger.info("Iniciando WellQ Admin API", entorno=settings.app_env)
 
     scheduler_task = None
+    telemetry_tasks: list[asyncio.Task] = []
     if settings.database_url:
         init_neon()
         await create_db_tables()
@@ -101,12 +105,44 @@ async def lifespan(app: FastAPI):
             logger.info("MongoDB (Motor) conectado e índices asegurados.")
         except Exception as exc:
             logger.warning("No se pudieron asegurar índices en MongoDB al arrancar", error=str(exc))
+
+        # Recomendación #5 — Tareas de telemetría: flusher (batch a Mongo) y
+        # watcher de change streams. Si Mongo NO está configurado, NO arrancan:
+        # `record_request()` sigue operando en memoria (buffer + histograma +
+        # hub), así que el feed en vivo y los ticks SSE funcionan igual.
+        telemetry_tasks.append(asyncio.create_task(telemetry_service.flusher_loop()))
+        telemetry_tasks.append(asyncio.create_task(telemetry_service.watch_pose_logs()))
+        logger.info("Telemetría #5 — flusher y watcher de pose_analysis_logs arrancados.")
     else:
         logger.info("MONGODB_URI no configurada — MongoDB desactivado.")
+        logger.info(
+            "Telemetría #5 — sin persistencia: el feed en vivo sigue activo "
+            "(buffer + histograma en memoria)."
+        )
 
     yield
 
     logger.info("Cerrando WellQ Admin API...")
+
+    # Recomendación #5 — Cierre limpio y drain de telemetría ANTES de cerrar MongoDB.
+    # En Cloud Run (SIGTERM con margen de 10s), asignamos un presupuesto estricto de 5s:
+    # 3s para cancelación de tareas + 2s de drain de respaldo, dejando 5s libres
+    # para desconexión limpia de pools de PostgreSQL y MongoDB antes de SIGKILL.
+    for task in telemetry_tasks:
+        task.cancel()
+    if telemetry_tasks:
+        try:
+            await asyncio.wait_for(asyncio.gather(*telemetry_tasks, return_exceptions=True), timeout=3.0)
+        except asyncio.TimeoutError:
+            logger.warning("Timeout (3s) esperando cancelación de tareas de telemetría")
+
+    # Respaldo de drenado final por si la tarea fue cancelada antes de vaciar todo el buffer
+    try:
+        await asyncio.wait_for(telemetry_service.drain_all_pending(), timeout=2.0)
+    except Exception as exc:
+        logger.warning("Fallo o timeout drenando buffer de telemetría en shutdown", error=str(exc))
+
+    telemetry_service.hub.close()
 
     # Recomendación #7 — detener APScheduler limpiamente
     shutdown_scheduler()
@@ -149,6 +185,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Recomendación #5 — Middleware de telemetría HTTP
+# ─────────────────────────────────────────────────────────────────────────────
+# Se registra DESPUÉS del CORSMiddleware a propósito: `app.middleware("http")`
+# se apila LIFO y envuelve TODO el stack, así que este middleware queda por
+# fuera del CORS y ve los preflight de OPTIONS ANTES de que el CORSMiddleware
+# los despache. Por eso OPTIONS está fuera de TRACKED_METHODS: no queremos
+# inflar el RPM con handshakes que no son tráfico real.
+app.middleware("http")(telemetry_middleware)
+
 # Registro de routers existentes
 app.include_router(auth.router)
 app.include_router(password_reset.router)
@@ -185,6 +231,7 @@ app.include_router(impersonation_console.router)  # Mejora #14 — /api/imperson
 app.include_router(two_factor.router)  # Mejora #18 — /api/auth/2fa/*, /api/auth/sessions
 app.include_router(incident_notifications.router)  # Mejora #19 — /api/v1/incident-notifications/*
 app.include_router(assistant.router)  # Mejora #20 — /api/v1/assistant/*
+app.include_router(telemetry.router)  # Recomendación #5 — /api/platform/telemetry/*
 
 
 # Registro de los nuevos componentes adaptados
