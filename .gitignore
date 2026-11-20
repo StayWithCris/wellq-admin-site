@@ -27,3 +27,6 @@ Thumbs.db
 .idea/
 
 backend/env.yaml
+
+# Knowledge graph (Graphify)
+graphify-out/
