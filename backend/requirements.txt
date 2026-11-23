@@ -39,5 +39,8 @@ python-dateutil==2.9.0
 # Logging estructurado
 structlog==24.1.0
 
+# Scheduler (APScheduler) — Recomendación #7 mejora
+apscheduler==3.10.4
+
 # Email transaccional
 resend==2.13.0

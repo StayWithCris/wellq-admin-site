@@ -26,6 +26,7 @@ import { logout as authLogout, getStoredUser, getCurrentUser } from './services/
 
 import { useLanguage } from './contexts/LanguageContext';
 import { useTheme }    from './contexts/ThemeContext';
+import { AssistantWidget } from './components/assistant/AssistantWidget'; // Mejora #20 - asistente LLM
 
 const SIDEBAR_W   = 256;
 const SIDEBAR_COL = 64;
@@ -1357,6 +1358,9 @@ export default function App() {
           </div>
         </main>
       </div>
+
+      {/* Mejora #20 — asistente conversacional de solo lectura */}
+      <AssistantWidget />
     </div>
   );
 }

@@ -8,7 +8,10 @@ import {
 import { useLanguage } from '../contexts/LanguageContext';
 import { Skeleton } from '../components/ui';
 import useHasPermission from '../hooks/useHasPermission'; // ← NUEVO: hook de permisos
-import { InfraCostsPanel } from '../components/platform/InfraCostsPanel'; // Mejora #6 — costos cloud
+import { InfraCostsPanel } from '../components/platform/InfraCostsPanel'; // Mejora #6 - costos cloud
+import { SyncPanel } from '../components/platform/SyncPanel'; // Recomendación #7 - sincronización programable
+import { TelemetryPanel } from '../components/platform/TelemetryPanel'; // Recomendación #5 - telemetría y registros reales
+import { IncidentNotificationsPanel } from '../components/platform/IncidentNotificationsPanel'; // Mejora #19 - notificaciones Email/Slack
 import { filterAndSortBySearch, hasSearchQuery, matchesSearch } from '../utils/search';
 
 // ─── Design Tokens para Platform Ops ───
@@ -391,8 +394,11 @@ export const PlatformOpsView = ({ apiCosts, apiLatency, apiPose, apiServers, sea
   const visibleServers = filterAndSortBySearch(servers, searchQuery, (s) => [t('platform.infrastructure'), s.name, s.status, t(`values.${s.status}`, s.status)]);
   const showInfrastructure = !searchActive || visibleServers.length > 0 || matchesSearch(searchQuery, t('platform.infrastructure'), 'server', 'infrastructure');
   const showVersions = !searchActive || matchesSearch(searchQuery, t('platform.appVersionDistribution'), t('platform.forceUpdateBtn'), t('platform.users'), 'app', 'version', 'force update');
+  const showSync = !searchActive || matchesSearch(searchQuery, t('platform.sync.title'), 'sync', 'sincronización', 'sincronizacion');
+  const showTelemetry = !searchActive || matchesSearch(searchQuery, t('platform.telemetry.title'), 'telemetría', 'telemetria', 'telemetry', 'logs', 'latencia', 'p50', 'p90', 'p99');
+  const showIncidents = !searchActive || matchesSearch(searchQuery, t('platform.incidents.title'), 'slack', 'email', 'correo', 'incidente', 'incident', 'notificación', 'notificacion');
 
-  if (searchActive && visibleCardIds.size === 0 && !showInfrastructure && !showVersions) {
+  if (searchActive && visibleCardIds.size === 0 && !showInfrastructure && !showVersions && !showSync && !showTelemetry && !showIncidents) {
     return <SearchEmptyState query={searchQuery} />;
   }
 
@@ -514,6 +520,27 @@ export const PlatformOpsView = ({ apiCosts, apiLatency, apiPose, apiServers, sea
       <motion.div variants={itemVariants}>
         <InfraCostsPanel />
       </motion.div>
+
+      {/* ── Sincronización de datos (Recomendación #7) ── */}
+      {showSync && (
+        <motion.div variants={itemVariants}>
+          <SyncPanel searchQuery={searchQuery} />
+        </motion.div>
+      )}
+
+      {/* ── Telemetría y registros reales (Recomendación #5) ── */}
+      {showTelemetry && (
+        <motion.div variants={itemVariants}>
+          <TelemetryPanel searchQuery={searchQuery} />
+        </motion.div>
+      )}
+
+      {/* ── Notificaciones de incidentes por Email y Slack (Mejora #19) ── */}
+      {showIncidents && (
+        <motion.div variants={itemVariants}>
+          <IncidentNotificationsPanel />
+        </motion.div>
+      )}
 
       {/* ── Infra + App versions ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
