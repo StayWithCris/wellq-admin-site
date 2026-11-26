@@ -476,3 +476,72 @@ export const streamAssistantChat = async (message, history, onEvent, signal) => 
     }
   }
 };
+
+// ─── Reportes programados (Recomendación #11) ─────────────────────────────────
+
+export const fetchReportMeta = () => apiFetch('/api/v1/reports/meta');
+
+export const fetchScheduledReports = () => apiFetch('/api/v1/reports/schedules');
+
+export const createScheduledReport = (body) =>
+  apiFetch('/api/v1/reports/schedules', { method: 'POST', body: JSON.stringify(body) });
+
+export const updateScheduledReport = (reportId, body) =>
+  apiFetch(`/api/v1/reports/schedules/${encodeURIComponent(reportId)}`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  });
+
+export const toggleScheduledReport = (reportId, isActive) =>
+  apiFetch(`/api/v1/reports/schedules/${encodeURIComponent(reportId)}/toggle`, {
+    method: 'PATCH',
+    body: JSON.stringify({ is_active: isActive }),
+  });
+
+export const deleteScheduledReport = (reportId) =>
+  apiFetch(`/api/v1/reports/schedules/${encodeURIComponent(reportId)}`, { method: 'DELETE' });
+
+export const previewScheduledReport = (reportId) =>
+  apiFetch(`/api/v1/reports/schedules/${encodeURIComponent(reportId)}/preview`);
+
+export const runScheduledReportNow = (reportId) =>
+  apiFetch(`/api/v1/reports/schedules/${encodeURIComponent(reportId)}/run`, { method: 'POST' });
+
+export const fetchScheduledReportRuns = (params = {}) => {
+  const qs = new URLSearchParams(
+    Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== '')),
+  ).toString();
+  return apiFetch(`/api/v1/reports/runs${qs ? `?${qs}` : ''}`);
+};
+
+/**
+ * Descarga el CSV de un reporte. El token va en el header Authorization,
+ * nunca en la URL.
+ */
+export const downloadScheduledReportCsv = async (reportId, filename) => {
+  const token = getAccessToken();
+  const res = await fetch(`${API_BASE}/api/v1/reports/schedules/${encodeURIComponent(reportId)}/export.csv`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) {
+    let detail = '';
+    try {
+      detail = formatApiDetail((await res.json())?.detail);
+    } catch {
+      detail = '';
+    }
+    throw new Error(detail || `HTTP ${res.status}`);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  try {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename || 'reporte.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+};

@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Skeleton } from '../components/ui';
 import CohortHeatmapGrid from '../components/analytics/CohortHeatmapGrid';
+import ScheduledReportsPanel from '../components/analytics/ScheduledReportsPanel'; // Rec #11 — reportes programados
 import { useLanguage } from '../contexts/LanguageContext';
 import { filterAndSortBySearch, hasSearchQuery, matchesSearch } from '../utils/search';
 
@@ -132,8 +133,9 @@ export const AnalyticsView = ({
   const showFeatureAdoption = !searchActive || visibleFeatureRows.length > 0 || matchesSearch(searchQuery, t('analytics.featureAdoption'), t('analytics.last30days'));
   const showAdherence = !searchActive || visibleAdherenceRows.length > 0 || matchesSearch(searchQuery, t('analytics.adherence'), t('analytics.topDropOff'), adherence?.top_dropping_point);
   const showCohorts = !searchActive || visibleCohortRows.length > 0 || matchesSearch(searchQuery, t('analytics.cohortRetention'), t('analytics.users'));
+  const showReports = !searchActive || matchesSearch(searchQuery, t('analytics.reports.title'), 'reporte', 'reportes', 'report', 'reports', 'csv', 'programado');
 
-  if (searchActive && !showAppUsage && !showSoapQuality && !showFeatureAdoption && !showAdherence && !showCohorts) {
+  if (searchActive && !showAppUsage && !showSoapQuality && !showFeatureAdoption && !showAdherence && !showCohorts && !showReports) {
     return (
       <motion.div className="space-y-7 font-sans" variants={{ hidden: {}, show: { transition: { staggerChildren: 0.05 } } }} initial="hidden" animate="show">
         <motion.div variants={{ hidden: { opacity: 0, y: 15 }, show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: 'easeOut' } } }} className="bg-white dark:bg-[#0b1017] rounded-2xl p-10 border border-wellq-gray/20 dark:border-[#1e293b] text-center">
@@ -447,6 +449,9 @@ export const AnalyticsView = ({
 
       {/* Rec #8 — Mapa de calor de cohortes (real) */}
       {!searchActive && <CohortHeatmapGrid />}
+
+      {/* Rec #11 — Reportes programados */}
+      {showReports && <ScheduledReportsPanel searchQuery={searchQuery} />}
     </motion.div>
   );
 };
