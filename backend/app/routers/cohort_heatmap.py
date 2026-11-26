@@ -28,44 +28,52 @@ def _months_between(y1: int, m1: int, y2: int, m2: int) -> int:
     return (y2 * 12 + m2) - (y1 * 12 + m1)
 
 
+def compute_retention_cohorts(clinics, now: datetime) -> tuple[list[dict], int]:
+    """Calcula las cohortes de retención (compartido con los reportes programados #11).
+
+    Devuelve (cohortes, max_month). Cada cohorte: {"cohort", "users", "retention"}.
+    """
+    groups: dict[tuple[int, int], list] = {}
+    for c in clinics:
+        if not c.created_at:
+            continue
+        groups.setdefault((c.created_at.year, c.created_at.month), []).append(c)
+
+    cohorts = []
+    max_month = 0
+    for (year, month) in sorted(groups):
+        group = groups[(year, month)]
+        elapsed = _months_between(year, month, now.year, now.month)
+        max_month = max(max_month, elapsed)
+        retention = []
+        for k in range(elapsed + 1):
+            boundary = _add_months(year, month, k)
+            kept = 0
+            for c in group:
+                active_now = c.status != "churned" and not c.is_deleted
+                if active_now:
+                    kept += 1
+                    continue
+                last = c.last_login or c.created_at
+                if c.is_deleted and c.deleted_at and c.deleted_at < last:
+                    last = c.deleted_at
+                if k == 0 or last >= boundary:
+                    kept += 1
+            retention.append(round(kept / len(group) * 100))
+        cohorts.append({
+            "cohort": f"{MESES[month - 1]} {year}",
+            "users": len(group),
+            "retention": retention,
+        })
+    return cohorts, max_month
+
+
 @router.get("/retention/heatmap", summary="Mapa de calor de retención por cohorte (real)")
 async def get_retention_heatmap(db: AsyncSession = Depends(get_db)):
     try:
         clinics = (await db.execute(select(Clinic))).scalars().all()
         now = datetime.utcnow()
-
-        groups: dict[tuple[int, int], list] = {}
-        for c in clinics:
-            if not c.created_at:
-                continue
-            groups.setdefault((c.created_at.year, c.created_at.month), []).append(c)
-
-        cohorts = []
-        max_month = 0
-        for (year, month) in sorted(groups):
-            group = groups[(year, month)]
-            elapsed = _months_between(year, month, now.year, now.month)
-            max_month = max(max_month, elapsed)
-            retention = []
-            for k in range(elapsed + 1):
-                boundary = _add_months(year, month, k)
-                kept = 0
-                for c in group:
-                    active_now = c.status != "churned" and not c.is_deleted
-                    if active_now:
-                        kept += 1
-                        continue
-                    last = c.last_login or c.created_at
-                    if c.is_deleted and c.deleted_at and c.deleted_at < last:
-                        last = c.deleted_at
-                    if k == 0 or last >= boundary:
-                        kept += 1
-                retention.append(round(kept / len(group) * 100))
-            cohorts.append({
-                "cohort": f"{MESES[month - 1]} {year}",
-                "users": len(group),
-                "retention": retention,
-            })
+        cohorts, max_month = compute_retention_cohorts(clinics, now)
 
         return {
             "status": "success",
