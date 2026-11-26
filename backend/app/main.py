@@ -25,6 +25,7 @@ from app.routers import two_factor
 from app.routers import incident_notifications
 from app.routers import assistant
 from app.routers import telemetry            # Recomendación #5 — Telemetría y registros reales
+from app.routers import scheduled_reports    # Recomendación #11 — Reportes programados
 import structlog
 import logging
 import asyncio
@@ -94,6 +95,9 @@ async def lifespan(app: FastAPI):
         logger.info("Neon (PostgreSQL) conectado y tablas verificadas.")
         # Recomendación #7 — APScheduler con cron en vez de asyncio loop
         start_scheduler()
+        # Recomendación #11 — job de reportes programados (cada 15 min)
+        from app.services.report_scheduler import register_reports_job
+        register_reports_job()
     else:
         logger.warning("DATABASE_URL no configurada — Neon desactivado.")
 
@@ -231,6 +235,7 @@ app.include_router(impersonation_console.router)  # Mejora #14 — /api/imperson
 app.include_router(two_factor.router)  # Mejora #18 — /api/auth/2fa/*, /api/auth/sessions
 app.include_router(incident_notifications.router)  # Mejora #19 — /api/v1/incident-notifications/*
 app.include_router(assistant.router)  # Mejora #20 — /api/v1/assistant/*
+app.include_router(scheduled_reports.router)  # Recomendación #11 — /api/v1/reports/*
 app.include_router(telemetry.router)  # Recomendación #5 — /api/platform/telemetry/*
 
 
