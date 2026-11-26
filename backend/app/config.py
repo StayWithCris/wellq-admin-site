@@ -64,6 +64,12 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-2.5-flash"
     assistant_rate_limit_per_minute: int = 20
 
+    # Recomendación #11 — Reportes programados.
+    # REPORTS_CRON_SECRET permite que Cloud Scheduler dispare los reportes
+    # vencidos (POST /api/v1/reports/dispatch-due) cuando Cloud Run escala a cero.
+    reports_scheduler_enabled: bool = True
+    reports_cron_secret: str = ""
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

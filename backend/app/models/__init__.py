@@ -9,6 +9,7 @@ from app.models.infrastructure import Server, BackgroundProcess, InfraNode
 from app.models.sync import ClinicianSummary, PatientHealthSummary, SyncRun
 from app.models.support import SupportTicket, Responder, TicketCategory
 from app.models.audit import ImpersonateAuditLog, ActionLog
+from app.models.reports import ScheduledReport, ScheduledReportRun
 
 __all__ = [
     "Clinic",
@@ -59,4 +60,6 @@ __all__ = [
     "TicketCategory",
     "ImpersonateAuditLog",
     "ActionLog",
+    "ScheduledReport",
+    "ScheduledReportRun",
 ]
